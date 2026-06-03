@@ -83,6 +83,16 @@ export const envSchema = z.object({
   S3_SECRET_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.string().default('true'),
 
+  // --- Mail / SMTP (M1.4 notifications; Mailhog locally) --------------------
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('no-reply@aicos.local'),
+
+  // --- Shipping (M1.4; Shippo aggregator) -----------------------------------
+  SHIPPO_API_KEY: z.string().optional(),
+
   // --- Search / Meilisearch -------------------------------------------------
   // Host always has a default; the master key may be absent (search degrades
   // gracefully — indexing/search become no-ops and the proxy returns empty).
@@ -217,6 +227,16 @@ export function configuration() {
       host: env.MEILI_HOST,
       apiKey: env.MEILI_MASTER_KEY,
       productsIndex: env.MEILI_PRODUCTS_INDEX,
+    },
+    mail: {
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+      from: env.MAIL_FROM,
+    },
+    shipping: {
+      shippoApiKey: env.SHIPPO_API_KEY,
     },
   };
 }

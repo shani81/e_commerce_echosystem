@@ -164,3 +164,59 @@ export async function checkout(email?: string): Promise<CheckoutResponse> {
   if (!token) throw new Error('Your cart is empty');
   return send<CheckoutResponse>('POST', '/checkout', { token, ...(email ? { email } : {}) });
 }
+
+// --- Customer portal (order lookup, returns, GDPR) --------------------------
+export interface OrderLine {
+  orderItemId: string;
+  productTitle: string;
+  variantTitle: string | null;
+  sku: string | null;
+  quantity: number;
+  unitPriceCents: number;
+  totalCents: number;
+}
+export interface OrderShipment {
+  status: string;
+  carrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: string | null;
+}
+export interface OrderLookupResult {
+  number: string;
+  status: string;
+  financialStatus: string;
+  fulfillmentStatus: string;
+  currency: string;
+  subtotalCents: number;
+  taxCents: number;
+  shippingCents: number;
+  totalCents: number;
+  placedAt: string | null;
+  createdAt: string;
+  items: OrderLine[];
+  shipments: OrderShipment[];
+  returns: { id: string; status: string; createdAt: string }[];
+}
+
+export const lookupOrder = (email: string, orderNumber: string) =>
+  send<OrderLookupResult>('POST', '/orders/lookup', { email, orderNumber });
+
+export const requestReturn = (
+  email: string,
+  orderNumber: string,
+  items: { orderItemId: string; quantity: number }[],
+  reason?: string,
+) =>
+  send<{ id: string; status: string; createdAt: string }>('POST', '/returns', {
+    email,
+    orderNumber,
+    items,
+    ...(reason ? { reason } : {}),
+  });
+
+export const requestDataAction = (email: string, type: 'EXPORT' | 'ERASURE') =>
+  send<{ id: string; type: string; status: string; dueAt: string }>('POST', '/gdpr/request', {
+    email,
+    type,
+  });

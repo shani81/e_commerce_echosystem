@@ -13,7 +13,11 @@ export {
   type ExtractionStage,
   EXTRACTION_JOBS,
   BILLING_JOBS,
+  NOTIFICATION_JOBS,
+  DSAR_JOBS,
   type ExtractionJobData,
   type StripeEventJobData,
+  type NotificationJobData,
+  type DsarJobData,
   extractionJobId,
 } from '@aicos/shared';

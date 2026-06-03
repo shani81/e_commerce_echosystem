@@ -1,7 +1,19 @@
 # AICOS — Completed
 
-> Work finished. Append newest at top. We are in **PHASE 1 — Core Commerce**; Phase 0 (foundation) is complete (exit review GO).
+> Work finished. Append newest at top. **PHASE 1 — Core Commerce is feature-complete (M1.1–M1.6).** Phase 0 (foundation) complete (exit review GO).
 > Last updated: 2026-06-04.
+
+## 2026-06-04 — Phase 1 · M1.4–M1.6 Shipping, notifications, returns, portal, GDPR & import
+
+| ID | Description | Evidence |
+|----|-------------|----------|
+| C1-020 | **Notifications pipeline** — `notifications` queue + worker `MailService` (nodemailer→SMTP/Mailhog, graceful log-only) + `NotificationsProcessor`; `Notification` rows as idempotency/audit anchor. Templates: order_confirmation, shipment_tracking, return_approved, return_refunded. | `apps/api/src/notifications/**`, `apps/worker/src/mail/**`, `apps/worker/src/queues/notifications.processor.ts` |
+| C1-021 | **M1.4 Shipping** — manual-carrier shipments + fulfillment; `/orders/:id/shipments`, `PATCH /shipments/:id`, `/shipments/:id/ship` → order FULFILLED + buyer tracking email. Shippo auto-label gated on `SHIPPO_API_KEY`. Order-paid → confirmation email (worker). | `apps/api/src/shipping/**`, `apps/worker/.../billing.processor.ts` |
+| C1-022 | **M1.5 Returns** — admin `/returns` list/detail/approve/reject/refund (restock RETURN ledger + Stripe refund when captured); public `/storefront/:slug/orders/lookup` + `/returns`. | `apps/api/src/returns/**`, `apps/api/src/portal/**` |
+| C1-023 | **M1.6 GDPR DSAR** — admin export/erase + `/gdpr/dsar` log; public `/storefront/:slug/gdpr/request` → `dsar` queue → worker export/erase (pseudonymize customer + orders + addresses) + AuditLog. | `apps/api/src/gdpr/**`, `apps/worker/src/queues/dsar.processor.ts` |
+| C1-024 | **M1.6 Import** — `/imports/products` CSV / WooCommerce / JSON → DRAFT products (self-contained CSV parser, brand upsert, slug dedupe). | `apps/api/src/import/**` |
+| C1-025 | **UI** — web `/orders` customer portal (lookup, tracking, return request, GDPR request); admin Returns / Import / Privacy pages + shipment actions on order detail; nav updated; RBAC `shipping:*/return:*/gdpr:*/import:write`. | `apps/web`, `apps/admin` |
+| C1-026 | **Verified** — contract smoke 20/20 (order PAID + 4 emails, shipment → FULFILLED, portal return → approve/refund + restock 8→9, CSV import, GDPR erasure scrubs order email). typecheck 14/14, lint 13/13, build 9/9. | smoke |
 
 ## 2026-06-04 — Phase 1 · M1.3 Checkout, payments & Stripe Connect
 

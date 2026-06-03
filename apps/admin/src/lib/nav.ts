@@ -27,9 +27,19 @@ export const navItems: NavItem[] = [
     icon: 'M4 6h16M4 12h16M4 18h10',
   },
   {
+    label: 'Import',
+    href: '/imports',
+    icon: 'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3',
+  },
+  {
     label: 'Orders',
     href: '/orders',
     icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 4h12M9 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z',
+  },
+  {
+    label: 'Returns',
+    href: '/returns',
+    icon: 'M3 7h13a4 4 0 014 4v1a4 4 0 01-4 4H6m0 0l3-3m-3 3l3 3',
   },
   {
     label: 'Inventory',
@@ -40,6 +50,11 @@ export const navItems: NavItem[] = [
     label: 'Payments',
     href: '/settings/connect',
     icon: 'M3 10h18M7 15h1m4 0h1M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z',
+  },
+  {
+    label: 'Privacy',
+    href: '/privacy',
+    icon: 'M12 3l7 4v5c0 4.4-3 8.5-7 9.5-4-1-7-5.1-7-9.5V7l7-4z',
   },
   {
     label: 'AI Extraction',

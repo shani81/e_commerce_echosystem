@@ -1,8 +1,9 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import type { Job } from 'bullmq';
+import type { Job, Queue } from 'bullmq';
 import {
   FinancialStatus,
+  NotificationChannel,
   OrderStatus,
   PaymentProvider,
   PaymentStatus,
@@ -11,7 +12,13 @@ import {
   withTenant,
   type Prisma,
 } from '@aicos/db';
-import { BILLING_JOBS, QUEUE_NAMES, type StripeEventJobData } from './contracts';
+import {
+  BILLING_JOBS,
+  NOTIFICATION_JOBS,
+  QUEUE_NAMES,
+  type NotificationJobData,
+  type StripeEventJobData,
+} from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -86,6 +93,7 @@ export class BillingProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @InjectQueue(QUEUE_NAMES.notifications) private readonly notifyQueue: Queue,
   ) {
     super();
   }
@@ -146,18 +154,18 @@ export class BillingProcessor extends WorkerHost {
     const amountTax = session.total_details?.amount_tax ?? 0;
     const cartToken = session.metadata?.cartToken;
 
-    await withTenant(this.prisma.client, tenantId, async (tx) => {
+    const confirm = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, tenantId },
         include: { items: true },
       });
       if (!order) {
         this.logger.warn(`checkout.session.completed: order ${orderId} not found`);
-        return;
+        return null;
       }
       if (order.status === OrderStatus.PAID || order.financialStatus === FinancialStatus.PAID) {
         this.logger.log(`order ${order.number} already PAID — skipping`);
-        return;
+        return null;
       }
 
       const paidAmount = amountTotal ?? order.totalCents;
@@ -201,7 +209,39 @@ export class BillingProcessor extends WorkerHost {
       }
 
       this.logger.log(`order ${order.number} → PAID (${paidAmount} ${order.currency})`);
+      return { email: order.email, number: order.number, total: paidAmount, currency: order.currency };
     });
+
+    // Order-confirmation email (best-effort): persist a Notification row + enqueue.
+    if (confirm?.email) {
+      const notif = await withTenant(this.prisma.client, tenantId, (tx) =>
+        tx.notification.create({
+          data: {
+            tenantId,
+            channel: NotificationChannel.EMAIL,
+            template: 'order_confirmation',
+            toAddress: confirm.email,
+            subject: `Order #${confirm.number} confirmed`,
+            payload: {
+              orderNumber: confirm.number,
+              totalCents: confirm.total,
+              currency: confirm.currency,
+            },
+            refType: 'order',
+            refId: orderId,
+          },
+          select: { id: true },
+        }),
+      );
+      const data: NotificationJobData = { tenantId, notificationId: notif.id };
+      await this.notifyQueue.add(NOTIFICATION_JOBS.send, data, {
+        jobId: `notif__${notif.id}`,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 2_000 },
+        removeOnComplete: 1_000,
+        removeOnFail: 5_000,
+      });
+    }
   }
 
   /** Greedily decrement on-hand across the variant's inventory items + ledger it. */
