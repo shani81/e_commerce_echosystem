@@ -52,6 +52,13 @@ export const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.string().default('true'),
+
+  // --- Search / Meilisearch -------------------------------------------------
+  // Host always has a default; the master key may be absent (search degrades
+  // gracefully — indexing/search become no-ops and the proxy returns empty).
+  MEILI_HOST: z.string().url().default('http://localhost:7700'),
+  MEILI_MASTER_KEY: z.string().optional(),
+  MEILI_PRODUCTS_INDEX: z.string().default('products'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -166,6 +173,11 @@ export function configuration() {
       // String env -> boolean; any value other than "false" enables path-style
       // addressing (required by MinIO and most S3-compatible stores).
       forcePathStyle: env.S3_FORCE_PATH_STYLE !== 'false',
+    },
+    meili: {
+      host: env.MEILI_HOST,
+      apiKey: env.MEILI_MASTER_KEY,
+      productsIndex: env.MEILI_PRODUCTS_INDEX,
     },
   };
 }

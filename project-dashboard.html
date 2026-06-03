@@ -269,7 +269,7 @@
 /* ============================ DATA ============================ */
 const D = {
   lastUpdated: "2026-06-03",
-  phase: "Phase 1 — Core Commerce (M1.1)",
+  phase: "Phase 1 — Core Commerce (M1.2)",
   northStar: "A non-technical physical-store owner records a short video of their shelves, uploads it, AI extracts the full catalog (names, prices, variants, images, SEO) with per-field confidence, the owner reviews and clicks Publish, and a complete operational online store goes live in under 15 minutes. AICOS is a general e-commerce operating system for any physical store.",
   stats: [
     {k:"Modules", v:"24", s:"across 6 phases"},
@@ -298,7 +298,7 @@ const D = {
   ],
   phases: [
     {key:"P0",name:"Foundation",goal:"Monorepo, Docker infra, IAM + multi-tenancy, billing skeleton, design system, CI/CD, observability.",status:"In Progress",completion:90,eta:"✓ exit review GO",milestones:["✓ M0.1 Monorepo + infra + CI","✓ M0.2 Prisma + RLS isolation test","✓ M0.3 Auth (RS256) + RBAC + tenant ctx","✓ M0.4 Billing skeleton + Stripe webhooks","✓ M0.5 Design system + observability"]},
-    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"In Progress",completion:24,eta:"→ 2026-12-09",milestones:["✓ M1.1 Catalog + inventory + media + admin UI","M1.2 Meili + storefront browse","M1.3 Stripe Checkout + Connect + tax","M1.4 Shipping (Shippo) + notifications","M1.5 Customer portal + returns","M1.6 GDPR DSAR + import"]},
+    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"In Progress",completion:36,eta:"→ 2026-12-09",milestones:["✓ M1.1 Catalog + inventory + media + admin UI","✓ M1.2 Meili search + storefront browse","M1.3 Stripe Checkout + Connect + tax","M1.4 Shipping (Shippo) + notifications","M1.5 Customer portal + returns","M1.6 GDPR DSAR + import"]},
     {key:"P2",name:"The Magic (AI Extraction)",goal:"AI provider abstraction, flagship video→catalog pipeline, product creation agent, human verification, AI content + SEO.",status:"Planned",completion:0,eta:"→ 2027-03-31 ⚠ highest uncertainty",milestones:["M2.1 ai-core + usage + fallback","M2.2 Ingest + frames + ZXing zero-cost","M2.3 Gemini + Claude + pgvector dedup","M2.4 Human review UI + publish gate","M2.5 Content/SEO + credits; demo"]},
     {key:"P3",name:"AI Store Builder",goal:"AI store generation from a name, website-cloning (inspiration, not copying), dynamic theme generation.",status:"Planned",completion:0,eta:"→ 2027-06-09",milestones:["M3.1 Theme engine + tokens","M3.2 Store builder from name","M3.3 Website cloning + guardrails","M3.4 Submit Google OAuth verification"]},
     {key:"P4",name:"Growth & Intelligence",goal:"Google ecosystem sync, marketing/customer-service/pricing agents, analytics & BI, AI inventory forecasting.",status:"Planned",completion:0,eta:"→ 2027-10-06",milestones:["M4.1 Merchant API v1 + GBP","M4.2 GA4 + Search Console + GTM","M4.3 Marketing + CS agents","M4.4 Pricing + analytics + forecasting"]},
@@ -426,6 +426,7 @@ const D = {
   ],
   intel: "6 research dossiers · 9 Master-Brain docs · flagship feature pack · 59-model schema · 317-endpoint registry · 12-agent spec",
   timeline: [
+    ["2026-06-03","Phase 1 (M1.2): Meilisearch index sync + tenant search/token + PUBLIC storefront browse/detail (web /shop + /products). Verified live (smoke 13/13). M1.2 complete."],
     ["2026-06-03","Phase 1 (M1.1): admin UI — auth/session + catalog & inventory CRUD screens + live overview KPIs (next build 11 routes). M1.1 complete."],
     ["2026-06-03","Phase 1 (M1.1): catalog + inventory + media APIs — tenant-scoped CRUD verified live (smoke 17/17: products, variants, stock adjust, media presign)"],
     ["2026-06-03","Phase 0 EXIT REVIEW → 🟢 GO for Phase 1 — foundation verified (typecheck 14/14, build 9/9, RLS 4/4, auth + webhook + metrics)"],
@@ -509,68 +510,120 @@ D.phases.forEach(p=>{const col=phaseColor(p.key);
     <div class="text-[11px] muted mb-2">${p.completion}% · ${esc(p.eta)}</div>
     <ul class="text-[11.5px] txt2 space-y-0.5">${p.milestones.map(m=>`<li class="flex gap-1.5"><span style="color:${col}">▸</span>${esc(m)}</li>`).join('')}</ul>`))});
 
-/* ---- Ecosystem diagram (Visio-style layered architecture) ---- */
-const ECO = {
-  lanes: [
-    {key:'P1', title:'Experience', sub:'Frontend (Next.js)', items:['Storefront','Admin Dashboard','Customer Portal']},
-    {key:'P0', title:'Platform Core', sub:'Foundation', items:['IAM · Multi-Tenancy','Billing','Search','Media','Notifications']},
-    {key:'P1', title:'Commerce Engine', sub:'A store can sell', items:['Catalog','Inventory','Orders','Payments','Shipping','Customers']},
-    {key:'P2', title:'AI Layer ★', sub:'The magic', items:['AI Core','AI Extraction ★','Content','12 AI Agents']},
-    {key:'P3', title:'Site Generation', sub:'Build from a name', items:['Store Builder','Website Cloning','Theme Engine']},
-    {key:'P4', title:'Growth & Intelligence', sub:'Scale revenue', items:['Google','Marketing','Customer Service','Pricing','Analytics']},
-    {key:'P5', title:'Scale & Ops', sub:'Enterprise', items:['Automation','Multi-region','Kubernetes','White-label']},
-  ],
-  data: {title:'Data & Infrastructure', sub:'Shared, RLS-isolated', items:['PostgreSQL · RLS','Redis · BullMQ','Meilisearch','S3 / R2 / MinIO']},
-  external: {title:'External Integrations', sub:'Third-party APIs', items:['Stripe','Google APIs','Shippo · PostNord','Claude · GPT · Gemini']},
-};
+/* ---- Ecosystem Overview — the Video→Catalog value loop (inspired by the social_media_marketing dashboard) ---- */
 function renderEcosystem(){
-  const W=1140, padX=20, gutter=30, chipW=158, chipH=33, gx=10, gy=9, lpadY=12, laneGap=15;
-  const innerX = padX + gutter + 176 + 14;
-  const perRow = Math.max(1, Math.floor((W - padX - innerX + gx)/(chipW + gx)));
-  let y = 40; const nodes = []; let body = '';
-  const drawLane = (l, o={}) => {
-    const rows = Math.ceil(l.items.length/perRow);
-    const h = lpadY*2 + rows*chipH + (rows-1)*gy;
-    const x = padX + gutter, w = W - padX - x;
-    const col = o.neutral ? 'var(--border-2)' : phaseColor(l.key);
-    const accent = o.neutral ? 'var(--muted)' : col;
-    body += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="13" style="fill:var(--surface-2);stroke:${col};stroke-opacity:${o.dashed?0.85:0.4}"${o.dashed?' stroke-dasharray="7 5"':''}/>`;
-    body += `<rect x="${x}" y="${y}" width="5" height="${h}" rx="2.5" style="fill:${col}"/>`;
-    body += `<text x="${x+18}" y="${y+24}" style="fill:var(--text);font-weight:700" font-size="13.5">${esc(l.title)}</text>`;
-    if(l.sub) body += `<text x="${x+18}" y="${y+41}" style="fill:var(--muted)" font-size="10.5">${esc(l.sub)}</text>`;
-    if(!o.neutral) body += `<text x="${x+18}" y="${y+h-11}" style="fill:${col};font-weight:800" font-size="10">${l.key}</text>`;
-    l.items.forEach((it,i)=>{
-      const r=Math.floor(i/perRow), c=i%perRow;
-      const cx=innerX + c*(chipW+gx), cy=y + lpadY + r*(chipH+gy);
-      const star = it.indexOf('★')>=0, stroke = star ? 'var(--brand)' : accent;
-      body += `<rect x="${cx}" y="${cy}" width="${chipW}" height="${chipH}" rx="9" style="fill:var(--surface);stroke:${stroke};stroke-opacity:${star?1:0.55}${star?';filter:url(#ecoGlow)':''}"/>`;
-      body += `<text x="${cx+chipW/2}" y="${cy+chipH/2+4}" text-anchor="middle" style="fill:var(--text)" font-size="10.8"${star?' font-weight="700"':''}>${esc(it)}</text>`;
-    });
-    nodes.push({cy:y + h/2, col});
-    y += h + laneGap;
-  };
-  ECO.lanes.forEach((l)=>drawLane(l));
-  drawLane(ECO.data,{neutral:true});
-  drawLane(ECO.external,{neutral:true,dashed:true});
-  const totalH = y - laneGap + 14;
-  const railX = padX + gutter/2;
-  const func = nodes.slice(0, ECO.lanes.length);
-  const dataNode = nodes[ECO.lanes.length], extNode = nodes[ECO.lanes.length+1];
-  let rail = `<line x1="${railX}" y1="${func[0].cy}" x2="${railX}" y2="${dataNode.cy}" style="stroke:var(--border-2)" stroke-width="2" marker-end="url(#ecoArr)"/>`;
-  rail += `<line x1="${railX}" y1="${dataNode.cy}" x2="${railX}" y2="${extNode.cy}" style="stroke:var(--border-2);stroke-dasharray:5 4" stroke-width="1.5"/>`;
-  func.forEach((n)=>{ rail += `<circle cx="${railX}" cy="${n.cy}" r="4.5" style="fill:var(--surface);stroke:${n.col}" stroke-width="2"/>`; });
-  rail += `<circle cx="${railX}" cy="${dataNode.cy}" r="4.5" style="fill:var(--surface);stroke:var(--muted)" stroke-width="2"/>`;
-  rail += `<circle cx="${railX}" cy="${extNode.cy}" r="4" style="fill:var(--surface);stroke:var(--muted)" stroke-width="1.5"/>`;
-  const head = `<text x="${padX}" y="23" style="fill:var(--text);font-weight:700" font-size="13.5">AICOS — AI Commerce OS</text>`
-    + `<text x="${W-padX}" y="23" text-anchor="end" style="fill:var(--muted)" font-size="11">Multi-tenant SaaS · shared DB + Postgres RLS · API-first</text>`;
-  const defs = `<defs><marker id="ecoArr" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M1,1 L8,4.5 L1,8 Z" style="fill:var(--muted)"/></marker>`
-    + `<filter id="ecoGlow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#6366f1" flood-opacity="0.55"/></filter></defs>`;
-  return `<svg viewBox="0 0 ${W} ${totalH}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">${defs}${head}${rail}${body}</svg>`;
+  const W=1180, H=500;
+  const stCol = s => ({done:'var(--st-done)',in_progress:'var(--st-progress)',planned:'var(--st-planned)'}[s]||'var(--muted)');
+  const stLbl = s => ({done:'Done',in_progress:'In progress',planned:'Planned'}[s]||s);
+  const ARR='url(#ecoArr)';
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:1040px;height:auto" font-family="Inter,sans-serif" role="img" aria-label="AICOS — video to catalog value loop">`;
+  s+=`<defs><marker id="ecoArr" markerWidth="9" markerHeight="9" refX="6.5" refY="4.5" orient="auto"><path d="M1,1 L8,4.5 L1,8 Z" style="fill:var(--muted)"/></marker>`
+    +`<filter id="ecoGlow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#6366f1" flood-opacity="0.5"/></filter></defs>`;
+
+  // primary-value-loop caption (lower-left, mirrors the inspiration)
+  s+=`<rect x="40" y="234" width="3" height="62" rx="1.5" style="fill:var(--brand)"/>`;
+  s+=`<text x="54" y="250" style="fill:var(--text);font-weight:700" font-size="13">Primary value loop</text>`;
+  s+=`<text x="54" y="269" style="fill:var(--muted)" font-size="11">film shelves → extract → human-gate → publish</text>`;
+  s+=`<text x="54" y="286" style="fill:var(--muted)" font-size="11">→ measure → re-learn · a live store in &lt;15 min</text>`;
+
+  // apex orchestrator
+  s+=`<rect x="440" y="14" width="300" height="54" rx="14" style="fill:color-mix(in srgb,var(--brand) 13%,var(--surface));stroke:var(--brand);stroke-width:2" filter="url(#ecoGlow)"/>`;
+  s+=`<text x="590" y="40" text-anchor="middle" style="fill:var(--text);font-weight:700" font-size="14.5">AI Extraction Engine</text>`;
+  s+=`<text x="590" y="57" text-anchor="middle" style="fill:var(--muted)" font-size="10">ai-core · Gemini → Claude · orchestrates every stage</text>`;
+
+  // pipeline ribbon (12 stages condensed to 6 steps; card 4 = the human gate)
+  const pipe=[
+    ['Capture & Sample','upload · frames · YOLO crop'],
+    ['Barcode + Enrich','ZXing · Open Food Facts · $0'],
+    ['Vision Extract & Dedup','Gemini→Claude · CLIP dedup'],
+    ['Human Review','owner approves / edits','gate'],
+    ['Drafts + Enrichment','SEO · content · compliance'],
+    ['Publish','owner action → catalog'],
+  ];
+  const px=18, pw=176, pgap=16, py=104, ph=82;
+  const cx = i => px+i*(pw+pgap)+pw/2;
+  // orchestration bus
+  s+=`<path d="M590,68 L590,90" style="stroke:var(--st-planned);stroke-dasharray:4 4;fill:none;opacity:.7"/>`;
+  s+=`<path d="M${cx(0)},90 L${cx(5)},90" style="stroke:var(--st-planned);stroke-dasharray:4 4;fill:none;opacity:.7"/>`;
+  s+=`<text x="${cx(0)+10}" y="86" style="fill:var(--muted);font-style:italic" font-size="9">orchestrates</text>`;
+  pipe.forEach((p,i)=>{
+    const x=px+i*(pw+pgap), gate=p[2]==='gate';
+    if(!gate) s+=`<path d="M${cx(i)},90 L${cx(i)},${py}" style="stroke:var(--st-planned);stroke-dasharray:4 4;fill:none;opacity:.7"/>`;
+    if(gate){
+      s+=`<rect x="${x}" y="${py-4}" width="${pw}" height="${ph+8}" rx="12" style="fill:color-mix(in srgb,var(--brand) 11%,var(--surface));stroke:var(--brand);stroke-width:2.2" filter="url(#ecoGlow)"/>`;
+      s+=`<rect x="${x+pw/2-48}" y="${py+6}" width="96" height="15" rx="7.5" style="fill:color-mix(in srgb,var(--brand) 20%,transparent)"/>`;
+      s+=`<text x="${x+pw/2}" y="${py+17}" text-anchor="middle" style="fill:var(--brand-ink);font-weight:800" font-size="8.5">★ MANDATORY</text>`;
+      s+=`<text x="${x+pw/2}" y="${py+41}" text-anchor="middle" style="fill:var(--text);font-weight:800" font-size="12.5">${p[0]}</text>`;
+      s+=`<text x="${x+pw/2}" y="${py+57}" text-anchor="middle" style="fill:var(--text-2)" font-size="9">${p[1]}</text>`;
+      s+=`<text x="${x+pw/2}" y="${py+72}" text-anchor="middle" style="fill:var(--muted)" font-size="8.5">the only non-AI gate</text>`;
+    } else {
+      s+=`<rect x="${x}" y="${py}" width="${pw}" height="${ph}" rx="11" style="fill:var(--surface);stroke:${stCol('planned')};stroke-opacity:.7"/>`;
+      s+=`<rect x="${x}" y="${py}" width="4" height="${ph}" rx="2" style="fill:${stCol('planned')}"/>`;
+      s+=`<text x="${x+14}" y="${py+26}" style="fill:var(--text);font-weight:700" font-size="12">${esc(p[0])}</text>`;
+      s+=`<text x="${x+14}" y="${py+45}" style="fill:var(--muted)" font-size="9.2">${esc(p[1])}</text>`;
+      s+=`<text x="${x+14}" y="${py+66}" style="fill:${stCol('planned')}" font-size="8.8">Planned · P2</text>`;
+    }
+    if(i<5){ const ax=x+pw; s+=`<path d="M${ax},${py+ph/2} L${ax+pgap},${py+ph/2}" style="stroke:var(--muted);fill:none" marker-end="${ARR}"/>`; }
+  });
+
+  // publish → outputs
+  s+=`<path d="M${cx(5)},${py+ph} L${cx(5)},210" style="stroke:var(--muted);fill:none" marker-end="${ARR}"/>`;
+
+  // outputs band (right)
+  const ox=600, ow=562;
+  s+=`<rect x="${ox}" y="210" width="${ow}" height="78" rx="12" style="fill:var(--surface-2);stroke:var(--border-2)"/>`;
+  s+=`<text x="${ox+18}" y="232" style="fill:var(--text);font-weight:700" font-size="12.5">Outputs — your live store</text>`;
+  s+=`<text x="${ox+18}" y="247" style="fill:var(--muted)" font-size="9.5">what Publish promotes to</text>`;
+  const outs=[['Storefront','done'],['Catalog','done'],['Search index','done'],['Google Merchant','planned'],['Sitemap','planned']];
+  const chw=102, chg=7, chx=ox+18, chy=255;
+  outs.forEach((o,i)=>{
+    const x=chx+i*(chw+chg);
+    s+=`<rect x="${x}" y="${chy}" width="${chw}" height="26" rx="7" style="fill:var(--surface);stroke:${stCol(o[1])};stroke-opacity:.8"/>`;
+    s+=`<circle cx="${x+11}" cy="${chy+13}" r="3" style="fill:${stCol(o[1])}"/>`;
+    s+=`<text x="${x+chw/2+7}" y="${chy+17}" text-anchor="middle" style="fill:var(--text)" font-size="9.3">${esc(o[0])}</text>`;
+  });
+
+  // growth band (right)
+  s+=`<path d="M${ox+ow/2},288 L${ox+ow/2},306" style="stroke:var(--muted);fill:none" marker-end="${ARR}"/>`;
+  s+=`<text x="${ox+8}" y="303" style="fill:var(--muted)" font-size="9.3">Growth &amp; intelligence · agents suggest, never auto-apply (P4)</text>`;
+  const grow=[['Analytics & BI','metrics → insights'],['Marketing','campaigns'],['Pricing','margin recs'],['Customer Svc','order help']];
+  const gw=131, gg=8, gx=ox+8, gy=308, gh=52;
+  grow.forEach((g,i)=>{
+    const x=gx+i*(gw+gg);
+    s+=`<rect x="${x}" y="${gy}" width="${gw}" height="${gh}" rx="10" style="fill:var(--surface);stroke:${stCol('planned')};stroke-opacity:.6"/>`;
+    s+=`<text x="${x+gw/2}" y="${gy+23}" text-anchor="middle" style="fill:var(--text);font-weight:700" font-size="11">${esc(g[0])}</text>`;
+    s+=`<text x="${x+gw/2}" y="${gy+39}" text-anchor="middle" style="fill:var(--muted)" font-size="8.7">${esc(g[1])}</text>`;
+  });
+
+  // feedback arc growth → apex (closes the loop, up the right margin)
+  const fbx=gx+3*(gw+gg)+gw;
+  s+=`<path d="M${fbx},${gy+gh/2} C1172,300 1172,46 742,42" style="stroke:var(--st-progress);stroke-width:1.7;stroke-dasharray:6 4;fill:none" marker-end="${ARR}"/>`;
+  s+=`<text x="1162" y="40" text-anchor="end" style="fill:var(--st-progress);font-style:italic" font-size="9.5">feedback → re-extract · re-price · re-merchandise</text>`;
+
+  // foundation band (full width, cross-cutting)
+  const fy=392, fh=92;
+  s+=`<rect x="18" y="${fy}" width="1144" height="${fh}" rx="14" style="fill:var(--surface-2);stroke:var(--border)"/>`;
+  s+=`<text x="34" y="${fy+22}" style="fill:var(--text);font-weight:700" font-size="12.5">Platform Foundation</text>`;
+  s+=`<text x="176" y="${fy+22}" style="fill:var(--muted)" font-size="10.5">· cross-cutting · P0 ~90% — the solid ground</text>`;
+  const found=[['IAM & Multi-Tenancy','done','P0'],['Billing & Credits','done','P0'],['Payments · Stripe','planned','P1'],['Media · R2 / MinIO','done','P1'],['Search · Meili','planned','P1'],['Postgres + RLS','done','P0']];
+  const fw=178, fg=12, fsx=26, fcy=fy+36, fch=46;
+  found.forEach((f,i)=>{
+    const x=fsx+i*(fw+fg);
+    s+=`<rect x="${x}" y="${fcy}" width="${fw}" height="${fch}" rx="9" style="fill:var(--surface);stroke:${stCol(f[1])};stroke-opacity:.7"/>`;
+    s+=`<rect x="${x}" y="${fcy}" width="4" height="${fch}" rx="2" style="fill:${stCol(f[1])}"/>`;
+    s+=`<text x="${x+14}" y="${fcy+20}" style="fill:var(--text);font-weight:600" font-size="11">${esc(f[0])}</text>`;
+    s+=`<text x="${x+14}" y="${fcy+36}" style="fill:${stCol(f[1])}" font-size="8.8">${stLbl(f[1])} · ${f[2]}</text>`;
+  });
+
+  s+=`</svg>`;
+  return s;
 }
 $('#ecoDiagram').innerHTML = renderEcosystem();
-[['P0','Foundation'],['P1','Commerce'],['P2','AI'],['P3','Site'],['P4','Growth'],['P5','Scale']].forEach(([k,name])=>{
-  $('#ecoLegend').append(el('span','chip',`<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${phaseColor(k)};margin-right:6px"></span>${k} · ${name}`));
+[['done','Done'],['in_progress','In progress'],['planned','Planned']].forEach(([k,name])=>{
+  const c={done:'var(--st-done)',in_progress:'var(--st-progress)',planned:'var(--st-planned)'}[k];
+  $('#ecoLegend').append(el('span','chip',`<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${c};margin-right:6px"></span>${name}`));
 });
+$('#ecoLegend').append(el('span','chip',`<span style="color:var(--brand-ink);margin-right:5px">★</span>mandatory human gate`));
 
 /* ---- Modules ---- */
 $('#modCount').textContent = `(${D.modules.length})`;
