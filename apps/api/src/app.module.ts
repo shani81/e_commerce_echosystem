@@ -4,7 +4,7 @@ import {
   type NestModule,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { configuration, validateEnv } from './config/configuration';
@@ -13,6 +13,8 @@ import { AuthModule } from './auth/auth.module';
 import { IamModule } from './iam/iam.module';
 import { BillingModule } from './billing/billing.module';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { HttpMetricsInterceptor } from './metrics/http-metrics.interceptor';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -35,6 +37,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      // Single source for local dev: app-specific apps/api/.env wins, else the
+      // repo-root .env. Real process env always takes precedence over both.
+      envFilePath: ['.env', '../../.env'],
       validate: validateEnv,
       load: [configuration],
     }),
@@ -68,10 +73,12 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     IamModule,
     BillingModule,
     HealthModule,
+    MetricsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
 })

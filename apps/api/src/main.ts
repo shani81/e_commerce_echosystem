@@ -52,7 +52,9 @@ async function bootstrap(): Promise<void> {
   );
 
   // --- Routing / lifecycle -------------------------------------------------
-  app.setGlobalPrefix('api/v1');
+  // `/metrics` is excluded so Prometheus can scrape it at the conventional root
+  // path; everything else is under `api/v1`.
+  app.setGlobalPrefix('api/v1', { exclude: ['metrics'] });
   app.enableShutdownHooks();
 
   const port = config.get<number>('http.port') ?? 4000;

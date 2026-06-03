@@ -1,6 +1,6 @@
 # AICOS — In Progress
 
-> We are in **PHASE 0 — Foundation**, now in implementation. Branch: `phase-0-foundation`.
+> **PHASE 0 — Foundation: complete** (🟢 exit review GO — `.ai/architecture/reviews/p0-exit-review.md`). Branch: `phase-0-foundation`. **Phase 1 — Core Commerce** is next.
 > Last updated: 2026-06-03.
 
 ## Phase 0 milestones
@@ -11,7 +11,7 @@
 | M0.2 Prisma schema v0 + RLS + FORCE; cross-tenant isolation test | ✅ Done | Isolation test **passes (4/4)**; two-role RLS model (D-010) |
 | M0.3 IAM: auth + RBAC + tenant context | 🟨 In Progress | Core done; **JWT now RS256** (access = RS256 keypair, refresh = HS256, verify pins `algorithms:['RS256']`). Remaining: team-invite/membership write endpoints, multi-tenant login selection |
 | M0.4 Billing skeleton + Stripe webhooks via BullMQ | 🟨 In Progress | Endpoints + **real Stripe signature verification** (`constructEvent` on the raw body) + worker processing with **event-id idempotency** (jobId dedup + Redis marker) done & **verified** (valid→200, bad/missing→400, duplicate processed once). Remaining: metered-usage plumbing, real subscription/invoice sync |
-| M0.5 Design system + observability + dashboard | 🟨 In Progress | `@aicos/ui` base + nestjs-pino logging done. Remaining: observability (OpenTelemetry/metrics), health dashboards, P0 exit review |
+| M0.5 Design system + observability + dashboard | ✅ Done | `@aicos/ui` base + **Prometheus `/metrics`** (api HTTP histogram + Node metrics; worker metrics) + structured pino logs (correlation ids, secret redaction) + Terminus health. **P0 exit review: 🟢 GO for Phase 1.** Carry-forward: OpenTelemetry tracing, dashboards/alerts |
 
 ## Immediate follow-ups (carried from scaffold verification)
 - ✅ JWT signing moved to **RS256** (access RS256 keypair + alg-pinned verify; refresh HS256). Keys via `pnpm keys:gen`. **Verified end-to-end** (token header `alg:RS256`, `/auth/me` verifies via public key).

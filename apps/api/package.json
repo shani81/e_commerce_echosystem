@@ -34,6 +34,7 @@
     "zod": "^3.24.1",
     "nestjs-pino": "^4.1.0",
     "pino-http": "^10.3.0",
+    "prom-client": "^15.1.3",
     "@aicos/db": "workspace:*",
     "@aicos/types": "workspace:*",
     "@aicos/shared": "workspace:*",

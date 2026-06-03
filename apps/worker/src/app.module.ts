@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthController } from './health/health.controller';
+import { MetricsController } from './metrics/metrics.controller';
 
 /**
  * Root module for the worker process.
@@ -60,6 +61,6 @@ import { HealthController } from './health/health.controller';
     RedisModule,
     QueuesModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
 })
 export class AppModule {}

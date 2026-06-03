@@ -8,11 +8,12 @@ AICOS is a next-generation, AI-first, multi-tenant **E-Commerce Operating System
 
 ## Status
 
-🟦 **Phase 0 — Foundation & Planning.** No application code yet. This repository currently contains the strategic plan, architecture, database design, roadmap, and the live project dashboard. Implementation begins after the planning deliverables are approved.
+🟨 **Phase 0 — Foundation (in progress).** The monorepo is scaffolded and the foundation is built & verified: multi-tenant **Postgres RLS** (cross-tenant isolation test passing), **IAM** (RS256 JWT auth, RBAC, AsyncLocalStorage tenant context), a **billing skeleton** with real Stripe webhook verification, Docker infra, CI, and an observability baseline (Prometheus `/metrics`, structured logs, health probes).
 
-- **Project dashboard:** open [`project-dashboard.html`](project-dashboard.html) in a browser for the executive view (progress, roadmap, risks, readiness scores, local URLs & credentials).
-- **Strategic brain & intelligence system:** see [`.ai/`](.ai/) — vision, business model, ecosystem/module maps, research, decisions, and registries.
-- **Source of truth:** [`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md) (business requirements) + [`CLAUDE_CODE_BASELINE.md`](CLAUDE_CODE_BASELINE.md) (technical standards & operating rules).
+- **Run it locally:** **[DEVELOPMENT.md](DEVELOPMENT.md)** — fresh clone → running in ~5 minutes.
+- **Project dashboard:** open [`project-dashboard.html`](project-dashboard.html) for the executive view (progress, roadmap, risks, readiness scores, local URLs & credentials).
+- **Strategic brain & intelligence system:** see [`.ai/`](.ai/) — vision, business model, ecosystem/module maps, research, decisions, registries, and current tasks.
+- **Source of truth:** [`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md) (business) + [`CLAUDE_CODE_BASELINE.md`](CLAUDE_CODE_BASELINE.md) (technical standards & operating rules).
 
 ---
 
