@@ -1,58 +1,98 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AICOS — Executive Project Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: { extend: {
-        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
-        colors: {
-          ink: { 950:'#0a0b0f', 900:'#0e1015', 850:'#13161d', 800:'#181c25', 700:'#222734', 600:'#2d3342' },
-          brand: { 400:'#7c9bff', 500:'#5b78f6', 600:'#4259e0' },
-          ok:'#34d399', warn:'#fbbf24', bad:'#f87171', info:'#60a5fa', mute:'#8b93a7'
-        }
-      } }
-    }
+  <script>/* set theme before paint to avoid flash */
+    (function(){try{var t=localStorage.getItem('aicos-theme')||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
   </script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    /* ---------- THEME TOKENS ---------- */
+    :root, [data-theme="dark"]{
+      --bg:#0a0b0f; --bg2:#0e1015;
+      --surface:#13161d; --surface-2:#181c25; --surface-3:#1f2532;
+      --border:#222734; --border-2:#2d3342;
+      --text:#e8ebf2; --text-2:#aeb6c7; --muted:#838b9e;
+      --brand:#5b78f6; --brand-ink:#8aa2ff;
+      --header-bg:rgba(10,11,15,.82);
+      --shadow:0 10px 34px -16px rgba(0,0,0,.75);
+      --glow:0 0 0 1px rgba(91,120,246,.30), 0 12px 36px -14px rgba(91,120,246,.5);
+      --p0:#60a5fa; --p1:#34d399; --p2:#a78bfa; --p3:#f472b6; --p4:#fbbf24; --p5:#fb923c;
+      --st-progress:#60a5fa; --st-planned:#838b9e; --st-done:#34d399; --st-blocked:#f87171; --st-working:#fbbf24; --st-hold:#a78bfa;
+      --sev-Critical:#f87171; --sev-High:#fb923c; --sev-Medium:#fbbf24; --sev-Low:#34d399;
+      --score-ok:#34d399; --score-good:#60a5fa; --score-warn:#fbbf24; --score-bad:#f87171;
+    }
+    [data-theme="light"]{
+      --bg:#f5f7fb; --bg2:#eef1f7;
+      --surface:#ffffff; --surface-2:#f3f5fa; --surface-3:#e9edf5;
+      --border:#e4e8f0; --border-2:#d2d9e6;
+      --text:#0f1422; --text-2:#3c4659; --muted:#697287;
+      --brand:#4259e0; --brand-ink:#3a4fd0;
+      --header-bg:rgba(245,247,251,.85);
+      --shadow:0 10px 28px -16px rgba(23,37,84,.22);
+      --glow:0 0 0 1px rgba(66,89,224,.22), 0 14px 34px -16px rgba(66,89,224,.32);
+      --p0:#2563eb; --p1:#059669; --p2:#7c3aed; --p3:#db2777; --p4:#d97706; --p5:#ea580c;
+      --st-progress:#2563eb; --st-planned:#697287; --st-done:#059669; --st-blocked:#dc2626; --st-working:#d97706; --st-hold:#7c3aed;
+      --sev-Critical:#dc2626; --sev-High:#ea580c; --sev-Medium:#d97706; --sev-Low:#059669;
+      --score-ok:#059669; --score-good:#2563eb; --score-warn:#d97706; --score-bad:#dc2626;
+    }
     html{scroll-behavior:smooth}
-    body{font-family:'Inter',sans-serif}
+    body{font-family:'Inter',sans-serif;background:
+      radial-gradient(1100px 520px at 12% -8%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 60%),
+      linear-gradient(180deg, var(--bg2), var(--bg));
+      background-attachment:fixed;color:var(--text);transition:background .35s ease,color .35s ease}
     .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
     ::-webkit-scrollbar{width:10px;height:10px}
-    ::-webkit-scrollbar-thumb{background:#2d3342;border-radius:6px}
-    ::-webkit-scrollbar-track{background:#0e1015}
-    .card{background:linear-gradient(180deg,#13161d,#0f1218);border:1px solid #222734;border-radius:14px}
-    .chip{font-size:11px;line-height:1;padding:4px 8px;border-radius:999px;border:1px solid #2d3342}
-    .nav-link{color:#8b93a7;font-size:13px;padding:6px 10px;border-radius:8px}
-    .nav-link:hover{color:#e6e9f0;background:#181c25}
+    ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+    .inset{background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+    .glow{box-shadow:var(--glow)}
+    .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;line-height:1;padding:5px 9px;border-radius:999px;border:1px solid var(--border-2);color:var(--muted);background:var(--surface-2);white-space:nowrap}
+    .txt{color:var(--text)} .txt2{color:var(--text-2)} .muted{color:var(--muted)} .brand{color:var(--brand-ink)}
+    .track{background:var(--surface-2);border-radius:999px;overflow:hidden}
+    .bd{border-color:var(--border)}
+    .divider{border-bottom:1px solid var(--border)}
+    .nav-link{color:var(--muted);font-size:13px;padding:6px 11px;border-radius:9px;transition:.15s}
+    .nav-link:hover{color:var(--text);background:var(--surface-2)}
     details>summary{list-style:none;cursor:pointer}
     details>summary::-webkit-details-marker{display:none}
-    .glow{box-shadow:0 0 0 1px rgba(91,120,246,.25),0 8px 30px -12px rgba(91,120,246,.45)}
+    .tog{position:relative;width:58px;height:30px;border-radius:999px;border:1px solid var(--border-2);background:var(--surface-2);cursor:pointer;transition:.25s}
+    .tog .knob{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:999px;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center;transition:.28s cubic-bezier(.5,1.4,.5,1)}
+    [data-theme="light"] .tog .knob{transform:translateX(28px)}
+    .tog svg{width:14px;height:14px;color:var(--brand-ink)}
+    .secttl{font-weight:700;color:var(--text);font-size:18px;letter-spacing:-.01em}
+    a.link{color:var(--brand-ink)} a.link:hover{text-decoration:underline}
+    .fade{animation:fade .4s ease both}@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   </style>
 </head>
-<body class="bg-ink-950 text-slate-200 antialiased">
+<body class="antialiased">
 
-<!-- ===================== STICKY HEADER ===================== -->
-<header class="sticky top-0 z-40 backdrop-blur bg-ink-950/85 border-b border-ink-700">
+<!-- ===================== HEADER ===================== -->
+<header class="sticky top-0 z-40 backdrop-blur" style="background:var(--header-bg);border-bottom:1px solid var(--border)">
   <div class="max-w-7xl mx-auto px-5 py-3 flex flex-wrap items-center gap-3">
     <div class="flex items-center gap-3 mr-auto">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 grid place-items-center font-extrabold text-white glow">A</div>
+      <div class="w-9 h-9 rounded-xl grid place-items-center font-extrabold text-white glow" style="background:linear-gradient(135deg,var(--brand),color-mix(in srgb,var(--brand) 70%, #000 12%))">A</div>
       <div>
-        <div class="font-bold text-white leading-tight">AI Commerce OS <span class="text-mute font-medium">· AICOS</span></div>
-        <div class="text-[11px] text-mute">Film your shelves → Publish your store → live in &lt;15 min</div>
+        <div class="font-bold txt leading-tight">AI Commerce OS <span class="muted font-medium">· AICOS</span></div>
+        <div class="text-[11px] muted">Film your shelves → Publish your store → live in &lt;15 min</div>
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <span class="chip" style="border-color:#2d3342;color:#8b93a7">Updated <span id="ts" class="text-slate-300 mono"></span></span>
+      <span class="chip">Updated <span id="ts" class="txt2 mono"></span></span>
       <span id="phaseChip" class="chip"></span>
       <span id="healthChip" class="chip"></span>
       <span id="readyChip" class="chip"></span>
+      <button id="themeBtn" class="tog" title="Toggle light / dark" aria-label="Toggle theme">
+        <span class="knob">
+          <svg id="thIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        </span>
+      </button>
     </div>
   </div>
   <nav class="max-w-7xl mx-auto px-4 pb-2 flex flex-wrap gap-1">
@@ -73,152 +113,152 @@
 
 <main class="max-w-7xl mx-auto px-5 py-6 space-y-10">
 
-  <!-- ===================== EXECUTIVE ===================== -->
-  <section id="exec" class="scroll-mt-28">
+  <!-- EXECUTIVE -->
+  <section id="exec" class="scroll-mt-28 fade">
     <div class="grid lg:grid-cols-3 gap-4">
       <div class="card p-5 lg:col-span-2">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-white font-bold text-lg">Executive Summary</h2>
-          <span class="chip" style="border-color:#4259e0;color:#7c9bff">Phase 0 · Planning</span>
+          <h2 class="secttl">Executive Summary</h2>
+          <span class="chip" style="border-color:var(--brand);color:var(--brand-ink)">Phase 0 · Planning</span>
         </div>
-        <p id="northStar" class="text-sm text-slate-300/90 leading-relaxed"></p>
+        <p id="northStar" class="text-sm txt2 leading-relaxed"></p>
         <div class="grid sm:grid-cols-4 gap-3 mt-4" id="execStats"></div>
       </div>
       <div class="card p-5">
-        <h3 class="text-white font-semibold mb-3">Health &amp; Readiness</h3>
+        <h3 class="font-semibold txt mb-3">Health &amp; Readiness</h3>
         <div id="scoreBars" class="space-y-2.5"></div>
       </div>
     </div>
   </section>
 
-  <!-- ===================== LOCAL DEV ACCESS ===================== -->
+  <!-- LOCAL DEV ACCESS -->
   <section id="access" class="scroll-mt-28">
     <details open class="card p-5">
       <summary class="flex items-center justify-between">
-        <h2 class="text-white font-bold text-lg">🔐 Local Dev Access <span class="text-mute text-xs font-normal">(this machine only — safe to store per project note)</span></h2>
-        <span class="text-mute text-xs">click to toggle</span>
+        <h2 class="secttl">🔐 Local Dev Access <span class="muted text-xs font-normal">(this machine only — safe to store per project note)</span></h2>
+        <span class="muted text-xs">toggle</span>
       </summary>
       <div class="grid md:grid-cols-2 gap-4 mt-4">
         <div>
-          <div class="text-xs uppercase tracking-wide text-mute mb-2">URLs</div>
+          <div class="text-xs uppercase tracking-wide muted mb-2">URLs</div>
           <div id="urls" class="space-y-1.5 text-sm mono"></div>
         </div>
         <div>
-          <div class="text-xs uppercase tracking-wide text-mute mb-2">Credentials</div>
+          <div class="text-xs uppercase tracking-wide muted mb-2">Credentials</div>
           <div id="creds" class="space-y-1.5 text-sm mono"></div>
         </div>
       </div>
-      <p class="text-[11px] text-mute mt-3">Ports auto-discovered as free and locked in <span class="mono text-slate-400">.ai/config/project-ports.json</span> (infra remapped — this machine already runs Postgres/Redis/MinIO/Mailhog on defaults).</p>
+      <p class="text-[11px] muted mt-3">Ports auto-discovered as free and locked in <span class="mono txt2">.ai/config/project-ports.json</span> (infra remapped — this machine already runs Postgres/Redis/MinIO/Mailhog on defaults).</p>
     </details>
   </section>
 
-  <!-- ===================== ROADMAP ===================== -->
+  <!-- ROADMAP (two rows) -->
   <section id="roadmap" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">Roadmap &amp; Milestones</h2>
-    <div class="card p-5 overflow-x-auto">
-      <div id="roadmapSvg" style="min-width:920px"></div>
+    <h2 class="secttl mb-3">Roadmap &amp; Milestones</h2>
+    <div class="card p-5 space-y-3">
+      <div class="overflow-x-auto"><div id="roadRow1" style="min-width:680px"></div></div>
+      <div class="divider"></div>
+      <div class="overflow-x-auto"><div id="roadRow2" style="min-width:680px"></div></div>
     </div>
     <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4" id="phaseCards"></div>
   </section>
 
-  <!-- ===================== ECOSYSTEM ===================== -->
+  <!-- ECOSYSTEM -->
   <section id="ecosystem" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">Ecosystem Overview</h2>
-    <div class="card p-5 overflow-x-auto">
-      <pre id="ecoTree" class="mono text-[12.5px] leading-6 text-slate-300"></pre>
-    </div>
+    <h2 class="secttl mb-3">Ecosystem Overview</h2>
+    <div class="card p-5 overflow-x-auto"><pre id="ecoTree" class="mono text-[12.5px] leading-6 txt2"></pre></div>
   </section>
 
-  <!-- ===================== MODULES ===================== -->
+  <!-- MODULES -->
   <section id="modules" class="scroll-mt-28">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-white font-bold text-lg">Modules <span id="modCount" class="text-mute text-sm font-normal"></span></h2>
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <h2 class="secttl">Modules <span id="modCount" class="muted text-sm font-normal"></span></h2>
       <div class="flex gap-1.5 flex-wrap" id="phaseFilter"></div>
     </div>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" id="moduleGrid"></div>
   </section>
 
-  <!-- ===================== DATA & API ===================== -->
+  <!-- DATA & API -->
   <section id="data" class="scroll-mt-28 grid lg:grid-cols-2 gap-4">
     <div class="card p-5">
-      <h2 class="text-white font-bold text-lg mb-1">Database</h2>
-      <p class="text-xs text-mute mb-3">Multi-tenant: shared DB + shared schema + <span class="mono">tenant_id</span> + Postgres RLS (FORCE)</p>
+      <h2 class="secttl mb-1">Database</h2>
+      <p class="text-xs muted mb-3">Multi-tenant: shared DB + shared schema + <span class="mono">tenant_id</span> + Postgres RLS (FORCE)</p>
       <div id="dbStat" class="mb-3"></div>
-      <div id="dbModules" class="space-y-2 text-sm"></div>
+      <div id="dbModules" class="space-y-1.5 text-sm"></div>
     </div>
     <div class="card p-5">
-      <h2 class="text-white font-bold text-lg mb-1">API Surface</h2>
-      <p class="text-xs text-mute mb-3">REST · <span class="mono">/api/v1</span> · JWT + tenant context · OpenAPI</p>
+      <h2 class="secttl mb-1">API Surface</h2>
+      <p class="text-xs muted mb-3">REST · <span class="mono">/api/v1</span> · JWT + tenant context · OpenAPI</p>
       <div id="apiStat" class="mb-3"></div>
       <div id="apiGroups" class="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]"></div>
     </div>
   </section>
 
-  <!-- ===================== AI ===================== -->
+  <!-- AI -->
   <section id="ai" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">AI Intelligence</h2>
+    <h2 class="secttl mb-3">AI Intelligence</h2>
     <div class="grid lg:grid-cols-2 gap-4">
       <div class="card p-5">
-        <h3 class="text-white font-semibold mb-1">Flagship: Video → Catalog Pipeline</h3>
-        <p class="text-xs text-mute mb-3">12 stages · Gemini-first + Claude fallback · mandatory human gate · target ≥70% drafts ≥0.65 confidence</p>
+        <h3 class="font-semibold txt mb-1">Flagship: Video → Catalog Pipeline</h3>
+        <p class="text-xs muted mb-3">12 stages · Gemini-first + Claude fallback · mandatory human gate · target ≥70% drafts ≥0.65 confidence</p>
         <ol id="pipeline" class="space-y-1.5 text-[13px]"></ol>
       </div>
       <div class="card p-5">
-        <h3 class="text-white font-semibold mb-3">Specialized AI Agents <span id="agentCount" class="text-mute text-xs font-normal"></span></h3>
+        <h3 class="font-semibold txt mb-3">Specialized AI Agents <span id="agentCount" class="muted text-xs font-normal"></span></h3>
         <div id="agents" class="space-y-1.5 text-[13px] max-h-[520px] overflow-y-auto pr-1"></div>
       </div>
     </div>
   </section>
 
-  <!-- ===================== INTEGRATIONS ===================== -->
+  <!-- INTEGRATIONS -->
   <section id="integrations" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">Integrations <span id="intCount" class="text-mute text-sm font-normal"></span></h2>
+    <h2 class="secttl mb-3">Integrations <span id="intCount" class="muted text-sm font-normal"></span></h2>
     <div id="intGroups" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
   </section>
 
-  <!-- ===================== REVENUE ===================== -->
+  <!-- REVENUE -->
   <section id="revenue" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">Revenue &amp; Pricing</h2>
+    <h2 class="secttl mb-3">Revenue &amp; Pricing</h2>
     <div class="grid lg:grid-cols-5 gap-3 mb-4" id="pricing"></div>
     <div class="grid md:grid-cols-2 gap-3" id="revStreams"></div>
   </section>
 
-  <!-- ===================== RISKS ===================== -->
+  <!-- RISKS -->
   <section id="risks" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">Risk Register <span id="riskCount" class="text-mute text-sm font-normal"></span></h2>
+    <h2 class="secttl mb-3">Risk Register <span id="riskCount" class="muted text-sm font-normal"></span></h2>
     <div class="card overflow-hidden">
       <table class="w-full text-[13px]">
-        <thead class="text-mute text-left border-b border-ink-700">
-          <tr><th class="py-2.5 px-4">Risk</th><th class="px-3">Category</th><th class="px-3">Sev</th><th class="px-3">Prob</th><th class="px-4 hidden lg:table-cell">Mitigation</th></tr>
-        </thead>
+        <thead class="muted text-left divider"><tr>
+          <th class="py-2.5 px-4 font-medium">Risk</th><th class="px-3 font-medium">Category</th><th class="px-3 font-medium">Sev</th><th class="px-3 font-medium">Prob</th><th class="px-4 font-medium hidden lg:table-cell">Mitigation</th>
+        </tr></thead>
         <tbody id="riskRows"></tbody>
       </table>
     </div>
   </section>
 
-  <!-- ===================== QUALITY / PLANNING QA ===================== -->
+  <!-- QUALITY -->
   <section id="quality" class="scroll-mt-28 grid lg:grid-cols-2 gap-4">
     <div class="card p-5">
-      <h2 class="text-white font-bold text-lg mb-1">Planning QA — Strengths</h2>
-      <p class="text-xs text-mute mb-3">From the automated completeness &amp; consistency critic</p>
+      <h2 class="secttl mb-1">Planning QA — Strengths</h2>
+      <p class="text-xs muted mb-3">From the automated completeness &amp; consistency critic</p>
       <ul id="strengths" class="space-y-1.5 text-[13px]"></ul>
     </div>
     <div class="card p-5">
-      <h2 class="text-white font-bold text-lg mb-1">Reconciliation Actions</h2>
-      <p class="text-xs text-mute mb-3">Critic-flagged fixes applied to keep the plan internally consistent</p>
+      <h2 class="secttl mb-1">Reconciliation Actions</h2>
+      <p class="text-xs muted mb-3">Critic-flagged fixes applied to keep the plan internally consistent</p>
       <ul id="reconcile" class="space-y-1.5 text-[13px]"></ul>
-      <div class="mt-3 text-xs text-mute">Research &amp; intelligence assets: <span class="text-slate-300" id="intel"></span></div>
+      <div class="mt-3 text-xs muted">Research &amp; intelligence assets: <span class="txt2" id="intel"></span></div>
     </div>
   </section>
 
-  <!-- ===================== ACTIVITY ===================== -->
+  <!-- ACTIVITY -->
   <section id="activity" class="scroll-mt-28">
-    <h2 class="text-white font-bold text-lg mb-3">Activity Timeline</h2>
-    <div class="card p-5"><ol id="timeline" class="relative border-l border-ink-700 ml-2 space-y-4"></ol></div>
+    <h2 class="secttl mb-3">Activity Timeline</h2>
+    <div class="card p-5"><ol id="timeline" class="relative ml-2 space-y-4" style="border-left:1px solid var(--border)"></ol></div>
   </section>
 
-  <footer class="text-center text-xs text-mute py-6">
-    AICOS executive dashboard · generated by the AICOS startup workflow · source of truth: <span class="mono">PROJECT_PROPOSAL.md</span> + <span class="mono">CLAUDE_CODE_BASELINE.md</span> · strategic brain in <span class="mono">.ai/</span>
+  <footer class="text-center text-xs muted py-6">
+    AICOS executive dashboard · source of truth: <span class="mono">PROJECT_PROPOSAL.md</span> + <span class="mono">CLAUDE_CODE_BASELINE.md</span> · strategic brain in <span class="mono">.ai/</span>
   </footer>
 </main>
 
@@ -230,7 +270,7 @@ const D = {
   northStar: "A non-technical physical-store owner records a short video of their shelves, uploads it, AI extracts the full catalog (names, prices, variants, images, SEO) with per-field confidence, the owner reviews and clicks Publish, and a complete operational online store goes live in under 15 minutes. AICOS is a general e-commerce operating system for any physical store.",
   stats: [
     {k:"Modules", v:"24", s:"across 6 phases"},
-    {k:"DB models", v:"54→59", s:"+5 P1-critical"},
+    {k:"DB models", v:"59", s:"multi-tenant + RLS"},
     {k:"API endpoints", v:"317", s:"26 module groups"},
     {k:"AI agents", v:"12", s:"+ 12-stage pipeline"}
   ],
@@ -367,7 +407,7 @@ const D = {
   strengths: [
     "Module names, keys & phase assignments are consistent with the SPEC across module-map, roadmap, api-registry, database-registry & the Prisma schema (24 modules, P0–P5, 1:1).",
     "Domain-override applied uniformly — every doc treats AICOS as a general e-commerce OS (not restaurant).",
-    "The Prisma schema is genuinely coherent: 54 models, cuid() ids, integer-cents money everywhere, tenantId + composite indexes, append-only ledgers, explicit human-gate, pgvector/citext/pg_trgm.",
+    "The Prisma schema is genuinely coherent: 59 models, cuid() ids, integer-cents money everywhere, tenantId + composite indexes, append-only ledgers, explicit human-gate, pgvector/citext/pg_trgm.",
     "All 7 strategic decisions represented identically & in depth; no contradictory search/storage references survive.",
     "Ports fully consistent across project-ports.json, roadmap, system-architecture & api-design — zero drift.",
     "Broad proposal coverage: flagship extraction, store builder + cloning, 11 theme verticals, 8 Google API families, Stripe Billing+Connect+Tax, 12 agents, RLS isolation, shipping, portal, all 9 real-world scenarios.",
@@ -381,7 +421,7 @@ const D = {
     "Added a 'Schema deferred to phase' ledger so P3–P4 gaps are tracked decisions, not silent omissions.",
     "Clarified JWT signing-key rotation (90d) vs access-token TTL (15m); fixed loose FK relations."
   ],
-  intel: "6 research dossiers · 9 Master-Brain docs · flagship feature pack · 54→59-model schema · 317-endpoint registry · 12-agent spec",
+  intel: "6 research dossiers · 9 Master-Brain docs · flagship feature pack · 59-model schema · 317-endpoint registry · 12-agent spec",
   timeline: [
     ["2026-06-03","Read source-of-truth (baseline + proposal); resolved restaurant↔e-commerce domain conflict → e-commerce wins"],
     ["2026-06-03","Git initialized; remote wired to github.com/shani81/e_commerce_echosystem"],
@@ -394,66 +434,73 @@ const D = {
 /* ============================ HELPERS ============================ */
 const $ = s => document.querySelector(s);
 const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
-const sevColor = s => ({Critical:'#f87171',High:'#fb923c',Medium:'#fbbf24',Low:'#34d399'}[s]||'#8b93a7');
-const statusColor = s => ({'In Progress':'#60a5fa','Planned':'#8b93a7','Completed':'#34d399','Blocked':'#f87171','Working On':'#fbbf24','On Hold':'#a78bfa'}[s]||'#8b93a7');
-const scoreColor = v => v>=70?'#34d399':v>=45?'#60a5fa':v>=25?'#fbbf24':'#f87171';
-const phaseColor = p => ({P0:'#60a5fa',P1:'#34d399',P2:'#a78bfa',P3:'#f472b6',P4:'#fbbf24',P5:'#fb923c'}[p]||'#8b93a7');
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const sevColor = s => `var(--sev-${s})`;
+const statusColor = s => ({'In Progress':'var(--st-progress)','Planned':'var(--st-planned)','Completed':'var(--st-done)','Blocked':'var(--st-blocked)','Working On':'var(--st-working)','On Hold':'var(--st-hold)'}[s]||'var(--muted)');
+const scoreColor = v => v>=70?'var(--score-ok)':v>=45?'var(--score-good)':v>=25?'var(--score-warn)':'var(--score-bad)';
+const phaseColor = p => `var(--${p.toLowerCase()})`;
+
+/* ============================ THEME TOGGLE ============================ */
+const SUN='<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+const MOON='<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>';
+function paintIcon(){$('#thIcon').innerHTML = document.documentElement.getAttribute('data-theme')==='light'?SUN:MOON;}
+$('#themeBtn').onclick=()=>{const cur=document.documentElement.getAttribute('data-theme');const next=cur==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('aicos-theme',next)}catch(e){}paintIcon();};
+paintIcon();
 
 /* ============================ RENDER ============================ */
 $('#ts').textContent = D.lastUpdated;
 $('#northStar').textContent = D.northStar;
-$('#phaseChip').outerHTML = `<span class="chip" style="border-color:#4259e0;color:#7c9bff">${D.phase}</span>`;
+$('#phaseChip').outerHTML = `<span class="chip" style="border-color:var(--brand);color:var(--brand-ink)">${D.phase}</span>`;
 $('#healthChip').outerHTML = `<span class="chip" style="border-color:${scoreColor(D.scores.overall)};color:${scoreColor(D.scores.overall)}">Health ${D.scores.overall}</span>`;
 $('#readyChip').outerHTML = `<span class="chip" style="border-color:${scoreColor(D.scores.enterpriseReadiness)};color:${scoreColor(D.scores.enterpriseReadiness)}">Enterprise ${D.scores.enterpriseReadiness}</span>`;
 
-D.stats.forEach(s=>{$('#execStats').append(el('div','rounded-xl bg-ink-850 border border-ink-700 p-3',
-  `<div class="text-2xl font-extrabold text-white">${s.v}</div><div class="text-xs text-slate-300 font-medium">${s.k}</div><div class="text-[11px] text-mute">${s.s}</div>`))});
+D.stats.forEach(s=>{$('#execStats').append(el('div','inset p-3',
+  `<div class="text-2xl font-extrabold txt">${s.v}</div><div class="text-xs txt2 font-medium">${s.k}</div><div class="text-[11px] muted">${s.s}</div>`))});
 
 D.scoreOrder.forEach(([k,label])=>{const v=D.scores[k];
-  $('#scoreBars').append(el('div','',`<div class="flex justify-between text-[12px] mb-1"><span class="${k==='overall'?'text-white font-semibold':'text-slate-300'}">${label}</span><span class="mono" style="color:${scoreColor(v)}">${v}</span></div><div class="h-1.5 rounded-full bg-ink-700 overflow-hidden"><div class="h-full rounded-full" style="width:${v}%;background:${scoreColor(v)}"></div></div>`))});
-$('#scoreBars').append(el('p','text-[11px] text-mute pt-1',D.scoreNote));
+  $('#scoreBars').append(el('div','',`<div class="flex justify-between text-[12px] mb-1"><span class="${k==='overall'?'txt font-semibold':'txt2'}">${label}</span><span class="mono" style="color:${scoreColor(v)}">${v}</span></div><div class="h-1.5 track"><div class="h-full" style="width:${v}%;background:${scoreColor(v)};border-radius:999px"></div></div>`))});
+$('#scoreBars').append(el('p','text-[11px] muted pt-1',D.scoreNote));
 
-D.urls.forEach(([k,u])=>$('#urls').append(el('div','flex justify-between gap-3',`<span class="text-mute">${k}</span><a class="text-brand-400 hover:underline" href="${u}" target="_blank">${u.replace('http://','')}</a>`)));
-D.creds.forEach(([r,u,p])=>$('#creds').append(el('div','flex justify-between gap-3 items-baseline',`<span class="text-mute">${r}</span><span class="text-slate-300">${u!=='—'?u+' / ':''}<span class="text-amber-300">${p}</span></span>`)));
+D.urls.forEach(([k,u])=>$('#urls').append(el('div','flex justify-between gap-3',`<span class="muted">${k}</span><a class="link" href="${u}" target="_blank">${u.replace('http://','')}</a>`)));
+D.creds.forEach(([r,u,p])=>$('#creds').append(el('div','flex justify-between gap-3 items-baseline',`<span class="muted">${r}</span><span class="txt2">${u!=='—'?u+' / ':''}<span style="color:var(--p4)">${p}</span></span>`)));
 
-/* ---- Roadmap SVG (visio-like timeline) ---- */
-(function(){
-  const W=920,H=300,padX=24,top=70,laneH=58,gap=18;
-  const n=D.phases.length, segW=(W-padX*2-gap*(n-1))/n;
+/* ---- Roadmap two rows ---- */
+function renderRoadmapRow(items, mountId){
+  const W=680,H=250,padX=18,top=64,laneH=56,gap=16;
+  const n=items.length, segW=(W-padX*2-gap*(n-1))/n;
   let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">`;
-  svg+=`<line x1="${padX}" y1="${top-22}" x2="${W-padX}" y2="${top-22}" stroke="#2d3342" stroke-width="2"/>`;
-  D.phases.forEach((p,i)=>{
+  svg+=`<line x1="${padX}" y1="${top-22}" x2="${W-padX}" y2="${top-22}" style="stroke:var(--border-2)" stroke-width="2"/>`;
+  items.forEach((p,i)=>{
     const x=padX+i*(segW+gap), col=phaseColor(p.key), done=p.status!=='Planned';
-    // axis node
-    svg+=`<circle cx="${x+10}" cy="${top-22}" r="6" fill="${done?col:'#181c25'}" stroke="${col}" stroke-width="2"/>`;
-    svg+=`<text x="${x+10}" y="${top-34}" fill="${col}" font-size="12" font-weight="700">${p.key}</text>`;
-    // phase block
-    svg+=`<rect x="${x}" y="${top}" width="${segW}" height="${laneH}" rx="10" fill="#13161d" stroke="${col}" stroke-opacity="0.5"/>`;
-    svg+=`<rect x="${x}" y="${top}" width="${segW*(p.completion/100)}" height="${laneH}" rx="10" fill="${col}" fill-opacity="0.18"/>`;
-    svg+=`<text x="${x+12}" y="${top+22}" fill="#e6e9f0" font-size="12.5" font-weight="700">${p.name}</text>`;
-    svg+=`<text x="${x+12}" y="${top+40}" fill="#8b93a7" font-size="10.5">${p.status} · ${p.completion}%</text>`;
-    svg+=`<text x="${x+segW-12}" y="${top+40}" fill="${col}" font-size="10" text-anchor="end">${p.eta.replace('→','').split('⚠')[0].trim()}</text>`;
-    // milestones
+    svg+=`<circle cx="${x+10}" cy="${top-22}" r="6" style="fill:${done?col:'var(--surface)'};stroke:${col}" stroke-width="2"/>`;
+    svg+=`<text x="${x+10}" y="${top-34}" style="fill:${col};font-weight:700" font-size="12">${p.key}</text>`;
+    svg+=`<rect x="${x}" y="${top}" width="${segW}" height="${laneH}" rx="11" style="fill:var(--surface-2);stroke:${col};stroke-opacity:.5"/>`;
+    svg+=`<rect x="${x}" y="${top}" width="${(segW*p.completion/100).toFixed(1)}" height="${laneH}" rx="11" style="fill:${col};fill-opacity:.16"/>`;
+    svg+=`<text x="${x+13}" y="${top+23}" style="fill:var(--text);font-weight:700" font-size="13">${esc(p.name)}</text>`;
+    svg+=`<text x="${x+13}" y="${top+41}" style="fill:var(--muted)" font-size="10.5">${p.status} · ${p.completion}%</text>`;
+    svg+=`<text x="${x+segW-12}" y="${top+41}" style="fill:${col}" font-size="10" text-anchor="end">${esc(p.eta.replace('→','').split('⚠')[0].trim())}</text>`;
     p.milestones.forEach((m,j)=>{
-      const my=top+laneH+gap+j*20.5;
-      svg+=`<circle cx="${x+9}" cy="${my-4}" r="3" fill="${col}"/>`;
-      const label=m.length>30?m.slice(0,29)+'…':m;
-      svg+=`<text x="${x+18}" y="${my}" fill="#aeb6c7" font-size="9.5">${label.replace(/&/g,'&amp;')}</text>`;
+      const my=top+laneH+gap+j*19.5;
+      svg+=`<circle cx="${x+9}" cy="${my-4}" r="3" style="fill:${col}"/>`;
+      const label=m.length>34?m.slice(0,33)+'…':m;
+      svg+=`<text x="${x+18}" y="${my}" style="fill:var(--text-2)" font-size="9.6">${esc(label)}</text>`;
     });
   });
   svg+=`</svg>`;
-  $('#roadmapSvg').innerHTML=svg;
-})();
+  $(mountId).innerHTML=svg;
+}
+renderRoadmapRow(D.phases.slice(0,3), '#roadRow1');
+renderRoadmapRow(D.phases.slice(3,6), '#roadRow2');
 
 D.phases.forEach(p=>{const col=phaseColor(p.key);
   $('#phaseCards').append(el('div','card p-4',
    `<div class="flex items-center justify-between mb-1.5"><span class="chip" style="border-color:${col};color:${col}">${p.key} · ${p.name}</span><span class="text-xs" style="color:${statusColor(p.status)}">${p.status}</span></div>
-    <p class="text-[12.5px] text-slate-300/90 mb-2 leading-snug">${p.goal}</p>
-    <div class="h-1.5 rounded-full bg-ink-700 overflow-hidden mb-1"><div class="h-full" style="width:${Math.max(p.completion,2)}%;background:${col}"></div></div>
-    <div class="text-[11px] text-mute mb-2">${p.completion}% · ${p.eta}</div>
-    <ul class="text-[11.5px] text-slate-400 space-y-0.5">${p.milestones.map(m=>`<li class="flex gap-1.5"><span style="color:${col}">▸</span>${m}</li>`).join('')}</ul>`))});
+    <p class="text-[12.5px] txt2 mb-2 leading-snug">${esc(p.goal)}</p>
+    <div class="h-1.5 track mb-1"><div class="h-full" style="width:${Math.max(p.completion,2)}%;background:${col};border-radius:999px"></div></div>
+    <div class="text-[11px] muted mb-2">${p.completion}% · ${esc(p.eta)}</div>
+    <ul class="text-[11.5px] txt2 space-y-0.5">${p.milestones.map(m=>`<li class="flex gap-1.5"><span style="color:${col}">▸</span>${esc(m)}</li>`).join('')}</ul>`))});
 
-/* ---- Ecosystem tree ---- */
+/* ---- Ecosystem ---- */
 $('#ecoTree').textContent =
 `AICOS — AI Commerce OS  (multi-tenant SaaS · shared DB + RLS)
 │
@@ -477,60 +524,60 @@ $('#ecoTree').textContent =
 $('#modCount').textContent = `(${D.modules.length})`;
 const phases=[...new Set(D.modules.map(m=>m.phase))].sort();
 let activePhase='all';
-const phaseBtns={};
 function renderModules(){
   const g=$('#moduleGrid'); g.innerHTML='';
   D.modules.filter(m=>activePhase==='all'||m.phase===activePhase).forEach(m=>{
     const col=phaseColor(m.phase), flag=m.name.includes('★');
-    g.append(el('div',`card p-3.5 ${flag?'glow':''}`,
-     `<div class="flex items-center justify-between mb-1"><span class="chip" style="border-color:${col};color:${col}">${m.phase}</span><span class="text-[10px] text-mute">Planned · 0%</span></div>
-      <div class="text-[13.5px] font-semibold text-white leading-snug mb-1">${m.name}</div>
-      <div class="text-[10.5px] text-mute mono">${m.key}</div>
-      ${m.deps.length?`<div class="text-[10.5px] text-slate-500 mt-1.5">↳ ${m.deps.join(' · ')}</div>`:`<div class="text-[10.5px] text-slate-600 mt-1.5">↳ no deps (foundation)</div>`}`));
+    g.append(el('div',`card p-3.5 fade ${flag?'glow':''}`,
+     `<div class="flex items-center justify-between mb-1"><span class="chip" style="border-color:${col};color:${col}">${m.phase}</span><span class="text-[10px] muted">Planned · 0%</span></div>
+      <div class="text-[13.5px] font-semibold txt leading-snug mb-1">${esc(m.name)}</div>
+      <div class="text-[10.5px] muted mono">${m.key}</div>
+      ${m.deps.length?`<div class="text-[10.5px] muted mt-1.5" style="opacity:.85">↳ ${m.deps.join(' · ')}</div>`:`<div class="text-[10.5px] muted mt-1.5" style="opacity:.6">↳ no deps (foundation)</div>`}`));
   });
 }
-$('#phaseFilter').append(el('button','chip',`all`));
-$('#phaseFilter').firstChild.onclick=()=>{activePhase='all';setActive('all')};
-phases.forEach(p=>{const b=el('button','chip',`${p}`);b.style.borderColor=phaseColor(p);b.style.color=phaseColor(p);b.onclick=()=>{activePhase=p;setActive(p)};phaseBtns[p]=b;$('#phaseFilter').append(b)});
-function setActive(p){[...$('#phaseFilter').children].forEach(b=>b.style.background='');const target=[...$('#phaseFilter').children].find(b=>b.textContent===p);if(target)target.style.background='#222734';renderModules()}
-renderModules();
+const allBtn=el('button','chip','all'); allBtn.style.cursor='pointer';
+allBtn.onclick=()=>{activePhase='all';setActive(allBtn)};
+$('#phaseFilter').append(allBtn);
+phases.forEach(p=>{const b=el('button','chip',p);b.style.cursor='pointer';b.style.borderColor=phaseColor(p);b.style.color=phaseColor(p);b.onclick=()=>{activePhase=p;setActive(b)};$('#phaseFilter').append(b)});
+function setActive(btn){[...$('#phaseFilter').children].forEach(b=>b.style.background='var(--surface-2)');btn.style.background='var(--surface-3)';renderModules()}
+setActive(allBtn);
 
 /* ---- DB & API ---- */
-$('#dbStat').innerHTML=`<span class="text-3xl font-extrabold text-white">${D.dbCount}</span> <span class="text-mute text-sm">models</span>`;
-D.dbModules.forEach(([m,c])=>$('#dbModules').append(el('div','flex justify-between gap-2 border-b border-ink-800 pb-1',`<span class="text-slate-300">${m}</span><span class="text-mute mono text-xs">${c}</span>`)));
-$('#apiStat').innerHTML=`<span class="text-3xl font-extrabold text-white">${D.apiCount}</span> <span class="text-mute text-sm">endpoints · ${D.apiGroups.length} groups</span>`;
-D.apiGroups.forEach(g=>$('#apiGroups').append(el('div','text-slate-400',`<span class="text-brand-400">/</span>${g}`)));
+$('#dbStat').innerHTML=`<span class="text-3xl font-extrabold txt">${D.dbCount}</span> <span class="muted text-sm">models</span>`;
+D.dbModules.forEach(([m,c])=>$('#dbModules').append(el('div','flex justify-between gap-2 divider pb-1',`<span class="txt2">${m}</span><span class="muted mono text-xs">${c}</span>`)));
+$('#apiStat').innerHTML=`<span class="text-3xl font-extrabold txt">${D.apiCount}</span> <span class="muted text-sm">endpoints · ${D.apiGroups.length} groups</span>`;
+D.apiGroups.forEach(g=>$('#apiGroups').append(el('div','txt2',`<span class="brand">/</span>${g}`)));
 
 /* ---- AI ---- */
-D.pipeline.forEach(([s,d])=>$('#pipeline').append(el('li','flex gap-2',`<span class="text-brand-400 font-semibold mono text-[11px] whitespace-nowrap">${s.split(' ')[0]}</span><span><span class="text-slate-200 font-medium">${s.replace(/^\d+ /,'')}</span> <span class="text-mute">— ${d}</span></span>`)));
+D.pipeline.forEach(([s,d])=>$('#pipeline').append(el('li','flex gap-2',`<span class="brand font-semibold mono text-[11px] whitespace-nowrap">${s.split(' ')[0]}</span><span><span class="txt font-medium">${esc(s.replace(/^\d+ /,''))}</span> <span class="muted">— ${esc(d)}</span></span>`)));
 $('#agentCount').textContent=`(${D.agents.length})`;
-D.agents.forEach(([n,p,prov])=>$('#agents').append(el('div','border-b border-ink-800 pb-1.5',`<div class="flex justify-between gap-2"><span class="text-slate-200 font-medium">${n}</span><span class="text-[10.5px] text-mute text-right">${prov}</span></div><div class="text-[11.5px] text-slate-400">${p}</div>`)));
+D.agents.forEach(([n,p,prov])=>$('#agents').append(el('div','divider pb-1.5',`<div class="flex justify-between gap-2"><span class="txt font-medium">${n}</span><span class="text-[10.5px] muted text-right">${prov}</span></div><div class="text-[11.5px] txt2">${esc(p)}</div>`)));
 
 /* ---- Integrations ---- */
 const intAll=Object.values(D.integrations).reduce((a,v)=>a+v.length,0);
 $('#intCount').textContent=`(${intAll})`;
 Object.entries(D.integrations).forEach(([cat,items])=>{
-  const c=el('div','card p-4',`<div class="text-xs uppercase tracking-wide text-mute mb-2">${cat}</div>`);
-  items.forEach(([n,d])=>c.append(el('div','mb-1.5',`<div class="text-[13px] text-slate-200 font-medium">${n}</div><div class="text-[11.5px] text-slate-400 leading-snug">${d}</div>`)));
+  const c=el('div','card p-4',`<div class="text-xs uppercase tracking-wide muted mb-2">${cat}</div>`);
+  items.forEach(([n,d])=>c.append(el('div','mb-1.5',`<div class="text-[13px] txt font-medium">${n}</div><div class="text-[11.5px] txt2 leading-snug">${esc(d)}</div>`)));
   $('#intGroups').append(c);
 });
 
 /* ---- Revenue ---- */
-D.pricing.forEach(([n,pr,f])=>$('#pricing').append(el('div','card p-4 text-center',`<div class="text-sm font-semibold text-white">${n}</div><div class="text-xl font-extrabold text-brand-400 my-1">${pr}</div><div class="text-[11px] text-mute leading-snug">${f}</div>`)));
-D.revStreams.forEach(([n,t,d])=>$('#revStreams').append(el('div','card p-4',`<div class="flex justify-between items-baseline mb-1"><span class="text-[13.5px] font-semibold text-white">${n}</span><span class="chip" style="border-color:#2d3342;color:#8b93a7">${t}</span></div><div class="text-[12px] text-slate-400">${d}</div>`)));
+D.pricing.forEach(([n,pr,f])=>$('#pricing').append(el('div','card p-4 text-center',`<div class="text-sm font-semibold txt">${n}</div><div class="text-xl font-extrabold brand my-1">${pr}</div><div class="text-[11px] muted leading-snug">${f}</div>`)));
+D.revStreams.forEach(([n,t,d])=>$('#revStreams').append(el('div','card p-4',`<div class="flex justify-between items-baseline mb-1"><span class="text-[13.5px] font-semibold txt">${n}</span><span class="chip">${t}</span></div><div class="text-[12px] txt2">${esc(d)}</div>`)));
 
 /* ---- Risks ---- */
 $('#riskCount').textContent=`(${D.risks.length} shown)`;
-D.risks.forEach(([t,c,sev,prob,mit])=>$('#riskRows').append(el('tr','border-b border-ink-800 align-top',
-  `<td class="py-2.5 px-4 text-slate-200">${t}</td><td class="px-3 text-mute">${c}</td><td class="px-3"><span class="chip" style="border-color:${sevColor(sev)};color:${sevColor(sev)}">${sev}</span></td><td class="px-3 text-slate-400">${prob}</td><td class="px-4 text-slate-400 text-[12px] hidden lg:table-cell">${mit}</td>`)));
+D.risks.forEach(([t,c,sev,prob,mit])=>$('#riskRows').append(el('tr','divider align-top',
+  `<td class="py-2.5 px-4 txt">${esc(t)}</td><td class="px-3 muted">${c}</td><td class="px-3"><span class="chip" style="border-color:${sevColor(sev)};color:${sevColor(sev)}">${sev}</span></td><td class="px-3 txt2">${prob}</td><td class="px-4 txt2 text-[12px] hidden lg:table-cell">${esc(mit)}</td>`)));
 
 /* ---- Quality ---- */
-D.strengths.forEach(s=>$('#strengths').append(el('li','flex gap-2',`<span class="text-ok">✓</span><span class="text-slate-300">${s}</span>`)));
-D.reconcile.forEach(s=>$('#reconcile').append(el('li','flex gap-2',`<span class="text-brand-400">⤳</span><span class="text-slate-300">${s}</span>`)));
+D.strengths.forEach(s=>$('#strengths').append(el('li','flex gap-2',`<span style="color:var(--score-ok)">✓</span><span class="txt2">${esc(s)}</span>`)));
+D.reconcile.forEach(s=>$('#reconcile').append(el('li','flex gap-2',`<span class="brand">⤳</span><span class="txt2">${esc(s)}</span>`)));
 $('#intel').textContent=D.intel;
 
 /* ---- Timeline ---- */
-D.timeline.forEach(([d,t])=>$('#timeline').append(el('li','ml-4',`<div class="absolute -left-[7px] w-3 h-3 rounded-full bg-brand-500 border-2 border-ink-950"></div><div class="text-[11px] text-mute mono">${d}</div><div class="text-[13px] text-slate-300">${t}</div>`)));
+D.timeline.forEach(([d,t])=>$('#timeline').append(el('li','ml-4',`<div class="absolute -left-[7px] w-3 h-3 rounded-full" style="background:var(--brand);border:2px solid var(--bg)"></div><div class="text-[11px] muted mono">${d}</div><div class="text-[13px] txt2">${esc(t)}</div>`)));
 </script>
 </body>
 </html>
