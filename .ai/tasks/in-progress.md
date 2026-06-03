@@ -7,7 +7,7 @@
 
 | Milestone | Status | Notes |
 |-----------|--------|-------|
-| **M1.1** Catalog + inventory + media (+ admin CRUD) | 🟨 In Progress | **API done & verified** — catalog (20 endpoints), inventory (11), media presign. Remaining: admin dashboard CRUD **UI** wiring. |
+| **M1.1** Catalog + inventory + media (+ admin CRUD) | ✅ Done | API (catalog 20 / inventory 11 / media presign) **+ admin UI** (auth/session, catalog products/variants/categories/brands, inventory items/adjust/locations, live overview KPIs). Verified: API smoke 17/17 + `next build` 11 routes + render smoke. |
 | **M1.2** Meilisearch + tenant tokens + storefront browse | 🟦 Planned | |
 | **M1.3** Stripe Checkout + Connect + tax + order-on-payment | 🟦 Planned | |
 | **M1.4** Shipping (Shippo) labels/tracking + notifications | 🟦 Planned | |

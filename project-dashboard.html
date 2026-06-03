@@ -277,7 +277,7 @@ const D = {
     {k:"API endpoints", v:"317", s:"26 module groups"},
     {k:"AI agents", v:"12", s:"+ 12-stage pipeline"}
   ],
-  scores: {architecture:66, documentation:72, scalability:42, tenantIsolation:55, security:40, enterpriseReadiness:38, uiux:24, performance:16, codeQuality:36, overall:40},
+  scores: {architecture:66, documentation:72, scalability:42, tenantIsolation:55, security:40, enterpriseReadiness:38, uiux:30, performance:16, codeQuality:38, overall:42},
   scoreOrder: [["overall","Overall health"],["enterpriseReadiness","Enterprise readiness"],["architecture","Architecture"],["documentation","Documentation"],["scalability","Scalability"],["tenantIsolation","Tenant isolation"],["security","Security"],["uiux","UI / UX"],["performance","Performance"],["codeQuality","Code quality"]],
   scoreNote: "Phase 0 complete (🟢 GO for Phase 1): RLS isolation, RS256 auth, Stripe webhook verification & an observability baseline all verified. Perf/scale unproven under load (expected).",
   urls: [
@@ -298,7 +298,7 @@ const D = {
   ],
   phases: [
     {key:"P0",name:"Foundation",goal:"Monorepo, Docker infra, IAM + multi-tenancy, billing skeleton, design system, CI/CD, observability.",status:"In Progress",completion:90,eta:"✓ exit review GO",milestones:["✓ M0.1 Monorepo + infra + CI","✓ M0.2 Prisma + RLS isolation test","✓ M0.3 Auth (RS256) + RBAC + tenant ctx","✓ M0.4 Billing skeleton + Stripe webhooks","✓ M0.5 Design system + observability"]},
-    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"In Progress",completion:15,eta:"→ 2026-12-09",milestones:["✓ M1.1 Catalog + inventory + media (API)","M1.2 Meili + storefront browse","M1.3 Stripe Checkout + Connect + tax","M1.4 Shipping (Shippo) + notifications","M1.5 Customer portal + returns","M1.6 GDPR DSAR + import"]},
+    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"In Progress",completion:24,eta:"→ 2026-12-09",milestones:["✓ M1.1 Catalog + inventory + media + admin UI","M1.2 Meili + storefront browse","M1.3 Stripe Checkout + Connect + tax","M1.4 Shipping (Shippo) + notifications","M1.5 Customer portal + returns","M1.6 GDPR DSAR + import"]},
     {key:"P2",name:"The Magic (AI Extraction)",goal:"AI provider abstraction, flagship video→catalog pipeline, product creation agent, human verification, AI content + SEO.",status:"Planned",completion:0,eta:"→ 2027-03-31 ⚠ highest uncertainty",milestones:["M2.1 ai-core + usage + fallback","M2.2 Ingest + frames + ZXing zero-cost","M2.3 Gemini + Claude + pgvector dedup","M2.4 Human review UI + publish gate","M2.5 Content/SEO + credits; demo"]},
     {key:"P3",name:"AI Store Builder",goal:"AI store generation from a name, website-cloning (inspiration, not copying), dynamic theme generation.",status:"Planned",completion:0,eta:"→ 2027-06-09",milestones:["M3.1 Theme engine + tokens","M3.2 Store builder from name","M3.3 Website cloning + guardrails","M3.4 Submit Google OAuth verification"]},
     {key:"P4",name:"Growth & Intelligence",goal:"Google ecosystem sync, marketing/customer-service/pricing agents, analytics & BI, AI inventory forecasting.",status:"Planned",completion:0,eta:"→ 2027-10-06",milestones:["M4.1 Merchant API v1 + GBP","M4.2 GA4 + Search Console + GTM","M4.3 Marketing + CS agents","M4.4 Pricing + analytics + forecasting"]},
@@ -426,6 +426,7 @@ const D = {
   ],
   intel: "6 research dossiers · 9 Master-Brain docs · flagship feature pack · 59-model schema · 317-endpoint registry · 12-agent spec",
   timeline: [
+    ["2026-06-03","Phase 1 (M1.1): admin UI — auth/session + catalog & inventory CRUD screens + live overview KPIs (next build 11 routes). M1.1 complete."],
     ["2026-06-03","Phase 1 (M1.1): catalog + inventory + media APIs — tenant-scoped CRUD verified live (smoke 17/17: products, variants, stock adjust, media presign)"],
     ["2026-06-03","Phase 0 EXIT REVIEW → 🟢 GO for Phase 1 — foundation verified (typecheck 14/14, build 9/9, RLS 4/4, auth + webhook + metrics)"],
     ["2026-06-03","Phase 0 (M0.3–M0.5): RS256 auth, real Stripe webhook verification, Prometheus /metrics observability baseline + bootstrap doc"],

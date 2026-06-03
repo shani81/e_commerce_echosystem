@@ -25,7 +25,6 @@ export const navItems: NavItem[] = [
     label: 'Catalog',
     href: '/catalog',
     icon: 'M4 6h16M4 12h16M4 18h10',
-    placeholder: true,
   },
   {
     label: 'Orders',
@@ -37,7 +36,6 @@ export const navItems: NavItem[] = [
     label: 'Inventory',
     href: '/inventory',
     icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-    placeholder: true,
   },
   {
     label: 'Billing',

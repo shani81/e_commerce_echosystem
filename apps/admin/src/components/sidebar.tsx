@@ -74,9 +74,9 @@ export function Sidebar() {
 
       <div className="border-t border-neutral-200 p-4">
         <div className="rounded-lg bg-neutral-50 p-3">
-          <p className="text-xs font-medium text-neutral-700">Phase 0 shell</p>
+          <p className="text-xs font-medium text-neutral-700">Phase 1 · M1.1</p>
           <p className="mt-0.5 text-xs text-neutral-400">
-            Placeholder navigation. Real data wiring lands in later phases.
+            Catalog &amp; inventory are live. Orders, billing &amp; AI land in later phases.
           </p>
         </div>
       </div>
