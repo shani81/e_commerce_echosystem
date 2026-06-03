@@ -1,0 +1,42 @@
+{
+  "name": "@aicos/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AICOS Prisma client + multi-tenant RLS helpers (single source of the DB layer)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "push": "prisma db push",
+    "migrate": "prisma migrate dev",
+    "deploy": "prisma migrate deploy",
+    "rls": "tsx scripts/apply-rls.ts",
+    "seed": "tsx prisma/seed.ts",
+    "studio": "prisma studio",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0"
+  },
+  "devDependencies": {
+    "@aicos/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "argon2": "^0.41.1",
+    "prisma": "^6.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,83 @@
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { BullModule } from '@nestjs/bullmq';
+import { LoggerModule } from 'nestjs-pino';
+import { configuration, validateEnv } from './config/configuration';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { IamModule } from './iam/iam.module';
+import { BillingModule } from './billing/billing.module';
+import { HealthModule } from './health/health.module';
+import { TenantMiddleware } from './tenant/tenant.middleware';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+
+/**
+ * Root application module.
+ *
+ * Wiring highlights:
+ *  - ConfigModule is global; env is validated by zod (`validateEnv`) at boot.
+ *  - LoggerModule (nestjs-pino) is the app logger; pretty-prints in dev.
+ *  - BullModule connects to Redis (REDIS_URL) for the billing queue.
+ *  - A GLOBAL JwtAuthGuard enforces auth on every route except those marked
+ *    `@Public()`; the global RolesGuard runs after it for `@Permissions(...)`.
+ *  - TenantMiddleware runs for ALL routes, populating the AsyncLocalStorage
+ *    tenant context from the verified access token / X-Tenant-Id.
+ */
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      validate: validateEnv,
+      load: [configuration],
+    }),
+
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const isProd = config.get<boolean>('isProduction') ?? false;
+        return {
+          pinoHttp: {
+            level: isProd ? 'info' : 'debug',
+            transport: isProd
+              ? undefined
+              : { target: 'pino-pretty', options: { singleLine: true } },
+            redact: ['req.headers.authorization', 'req.headers.cookie'],
+            autoLogging: true,
+          },
+        };
+      },
+    }),
+
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: { url: config.getOrThrow<string>('redis.url') },
+      }),
+    }),
+
+    PrismaModule,
+    AuthModule,
+    IamModule,
+    BillingModule,
+    HealthModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+  ],
+})
+export class AppModule implements NestModule {
+  /** Apply the tenant-context middleware to every route. */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(TenantMiddleware).forRoutes('*');
+  }
+}

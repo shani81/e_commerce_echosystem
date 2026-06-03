@@ -5,7 +5,9 @@ name: aicos
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector image = official Postgres 16 (>=16.9, RLS CVE fixes) + pgvector extension.
+    # Schema requires extensions: pgcrypto, pg_trgm, vector, citext.
+    image: pgvector/pgvector:pg16
     container_name: aicos-postgres
     restart: unless-stopped
     environment:

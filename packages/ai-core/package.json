@@ -1,0 +1,29 @@
+{
+  "name": "@aicos/ai-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AICOS AI provider abstraction — the swap layer over Claude/OpenAI/Gemini (interfaces + router skeleton, no network calls in Phase 0)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "zod": "^3.24.1",
+    "@aicos/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@aicos/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

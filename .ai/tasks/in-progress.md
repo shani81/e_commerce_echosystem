@@ -1,22 +1,26 @@
 # AICOS — In Progress
 
-> Tasks actively being worked right now. We are in **PHASE 0 (planning)** — the only active work is the planning/design effort itself; no implementation tasks have started.
+> We are in **PHASE 0 — Foundation**, now in implementation. Branch: `phase-0-foundation`.
 > Last updated: 2026-06-03.
 
-| ID | Description | Owner role | Started | Status | Notes |
-|----|-------------|-----------|---------|--------|-------|
-| T-PLAN-01 | Produce Master Brain set: platform roadmap, strategic decisions, risk register, enterprise readiness | Program/Delivery Lead | 2026-06-03 | In Progress | Roadmap + decisions + risks + readiness drafted under `.ai/master-brain/` |
-| T-PLAN-02 | Seed task system: backlog (P0 + early P1), in-progress, completed | Program/Delivery Lead | 2026-06-03 | In Progress | This file + `backlog.md` + `completed.md` |
-| T-PLAN-03 | Author generic rollback-plan template | Program/Delivery Lead | 2026-06-03 | In Progress | `.ai/releases/rollback-plan.md` |
-| T-PLAN-04 | Keep `project-dashboard.html` consistent with finalized plan (phases, milestones, last-updated) | Program/Delivery Lead | 2026-06-03 | In Progress | Reflect P0 = ~15% in progress, others Planned |
+## Phase 0 milestones
 
-## Definition of done for the planning phase (T-PLAN-*)
-- All Master Brain docs present, internally consistent, and aligned with `PROJECT_PROPOSAL.md` + SPEC names/modules/phases.
-- Backlog covers all P0 tasks + the first P1 commerce slice with dependencies and Planned status.
-- Rollback template is generic and reusable across phases.
-- Dashboard reflects current status. On approval, T-P0-* implementation tasks move here from `backlog.md`.
+| Milestone | Status | Notes |
+|-----------|--------|-------|
+| M0.1 Monorepo + Compose infra + CI skeleton | ✅ Done | typecheck 14/14, build 9/9; CI green-path defined |
+| M0.2 Prisma schema v0 + RLS + FORCE; cross-tenant isolation test | ✅ Done | Isolation test **passes (4/4)**; two-role RLS model (D-010) |
+| M0.3 IAM: auth + RBAC + tenant context | 🟨 In Progress | Core done (auth/JWT/RBAC/ALS). Remaining: switch HS256→RS256 keys, team-invite/membership write endpoints, multi-tenant login selection |
+| M0.4 Billing skeleton + Stripe webhooks via BullMQ | 🟨 In Progress | Endpoints + webhook→queue producer + worker processor stub done. Remaining: real Stripe signature verification (add SDK), idempotency on event id, metered-usage plumbing |
+| M0.5 Design system + observability + dashboard | 🟨 In Progress | `@aicos/ui` base + nestjs-pino logging done. Remaining: observability (OpenTelemetry/metrics), health dashboards, P0 exit review |
 
-## Next to pick up (on plan approval)
-1. T-P0-REPO-01 — scaffold the pnpm monorepo.
-2. T-P0-INFRA-01 — Docker Compose infra on locked ports (Postgres 16.9+).
-3. T-P0-DB-01/02/03 — Prisma schema v0 + RLS + FORCE + `withTenant`.
+## Immediate follow-ups (carried from scaffold verification)
+- Move JWT signing to **RS256** (tenant-model specifies it); generate dev keypair.
+- Wire **real Stripe** signature verification in `StripeWebhookController` (raw body already available) + worker idempotency keyed on event id.
+- Collapse `apps/worker/src/queues/contracts.ts` into `@aicos/shared` once its queue surface is stable (producer/consumer in lockstep).
+- Add API **CORS allow-list** for `http://localhost:3000` and `:3100` so the storefront/admin health probes succeed.
+- Wire `@aicos/db` build + `prisma generate` into a fresh-clone bootstrap doc (`pnpm install && pnpm db:setup`).
+
+## Next (M0.5 → Phase 1 entry)
+1. Observability baseline (request logging is in; add metrics + error tracking).
+2. P0 exit review against `enterprise-readiness.md`.
+3. Begin **Phase 1 — Core Commerce**: catalog → inventory → orders → payments (see `backlog.md`).

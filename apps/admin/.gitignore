@@ -1,0 +1,15 @@
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Env
+.env
+.env.local
+.env*.local
+
+# Debug
+*.tsbuildinfo
+next-env.d.ts.bak

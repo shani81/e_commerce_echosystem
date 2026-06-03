@@ -1,0 +1,9 @@
+{
+  "name": "@aicos/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared TypeScript configs for AICOS workspaces",
+  "files": [
+    "tsconfig"
+  ]
+}

@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Base tokens. These CSS variables mirror a subset of the @aicos/ui design
+ * tokens for use outside utility classes (e.g. raw CSS, gradients). The Tailwind
+ * theme remains the primary source of truth for utility classes.
+ */
+@layer base {
+  :root {
+    --background: #f8fafc; /* neutral-50 */
+    --foreground: #0f172a; /* neutral-900 */
+    --brand: #4f46e5; /* brand-600 */
+    --ring: #6366f1; /* brand-500 */
+  }
+
+  * {
+    border-color: theme('colors.neutral.200');
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Subtle, decorative radial backdrop used by the landing hero. */
+@layer utilities {
+  .bg-hero-grid {
+    background-image:
+      radial-gradient(60rem 30rem at 50% -10%, rgb(99 102 241 / 0.12), transparent 70%),
+      radial-gradient(40rem 24rem at 90% 10%, rgb(79 70 229 / 0.08), transparent 70%);
+  }
+}

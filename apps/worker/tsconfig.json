@@ -1,0 +1,15 @@
+{
+  "extends": "../../packages/config/tsconfig/nest.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "types": ["node"],
+    // `nest build` wipes dist via deleteOutDir; disable TS incremental so the
+    // emit is always complete (a stale .tsbuildinfo would otherwise skip
+    // re-emitting unchanged files and leave dist missing modules).
+    "incremental": false
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}

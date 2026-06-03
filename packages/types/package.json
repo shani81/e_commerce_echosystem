@@ -1,0 +1,25 @@
+{
+  "name": "@aicos/types",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AICOS shared TypeScript types (API envelopes, auth/JWT, money primitives)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@aicos/config": "workspace:*",
+    "typescript": "^5.7.2"
+  }
+}
