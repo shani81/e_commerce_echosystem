@@ -165,8 +165,11 @@
 
   <!-- ECOSYSTEM -->
   <section id="ecosystem" class="scroll-mt-28">
-    <h2 class="secttl mb-3">Ecosystem Overview</h2>
-    <div class="card p-5 overflow-x-auto"><pre id="ecoTree" class="mono text-[12.5px] leading-6 txt2"></pre></div>
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <h2 class="secttl">Ecosystem Overview</h2>
+      <div id="ecoLegend" class="flex flex-wrap gap-1.5"></div>
+    </div>
+    <div class="card p-5 overflow-x-auto"><div id="ecoDiagram" style="min-width:720px"></div></div>
   </section>
 
   <!-- MODULES -->
@@ -502,25 +505,68 @@ D.phases.forEach(p=>{const col=phaseColor(p.key);
     <div class="text-[11px] muted mb-2">${p.completion}% · ${esc(p.eta)}</div>
     <ul class="text-[11.5px] txt2 space-y-0.5">${p.milestones.map(m=>`<li class="flex gap-1.5"><span style="color:${col}">▸</span>${esc(m)}</li>`).join('')}</ul>`))});
 
-/* ---- Ecosystem ---- */
-$('#ecoTree').textContent =
-`AICOS — AI Commerce OS  (multi-tenant SaaS · shared DB + RLS)
-│
-├─ Platform Core ............ iam · billing · admin · notifications · media · search
-│
-├─ Commerce Engine ......... catalog · inventory · orders · payments · shipping · customers · storefront
-│
-├─ AI Layer ★ .............. ai-core ─┬─ ai-extraction (video→catalog, FLAGSHIP)
-│                                     ├─ content (descriptions/SEO)
-│                                     └─ 12 agents (product/design/seo/marketing/…)
-│
-├─ Site Generation ......... store-builder ─ website-cloning ─ theme-engine
-│
-├─ Growth & Intelligence ... google ─ marketing ─ customer-service ─ pricing ─ analytics
-│
-└─ Scale ................... automation · multi-region · k8s · white-label
-        │
-        External ........... Stripe · Google (Merchant/GBP/GA4/GSC) · Shippo/PostNord · R2/S3 · Ads`;
+/* ---- Ecosystem diagram (Visio-style layered architecture) ---- */
+const ECO = {
+  lanes: [
+    {key:'P1', title:'Experience', sub:'Frontend (Next.js)', items:['Storefront','Admin Dashboard','Customer Portal']},
+    {key:'P0', title:'Platform Core', sub:'Foundation', items:['IAM · Multi-Tenancy','Billing','Search','Media','Notifications']},
+    {key:'P1', title:'Commerce Engine', sub:'A store can sell', items:['Catalog','Inventory','Orders','Payments','Shipping','Customers']},
+    {key:'P2', title:'AI Layer ★', sub:'The magic', items:['AI Core','AI Extraction ★','Content','12 AI Agents']},
+    {key:'P3', title:'Site Generation', sub:'Build from a name', items:['Store Builder','Website Cloning','Theme Engine']},
+    {key:'P4', title:'Growth & Intelligence', sub:'Scale revenue', items:['Google','Marketing','Customer Service','Pricing','Analytics']},
+    {key:'P5', title:'Scale & Ops', sub:'Enterprise', items:['Automation','Multi-region','Kubernetes','White-label']},
+  ],
+  data: {title:'Data & Infrastructure', sub:'Shared, RLS-isolated', items:['PostgreSQL · RLS','Redis · BullMQ','Meilisearch','S3 / R2 / MinIO']},
+  external: {title:'External Integrations', sub:'Third-party APIs', items:['Stripe','Google APIs','Shippo · PostNord','Claude · GPT · Gemini']},
+};
+function renderEcosystem(){
+  const W=1140, padX=20, gutter=30, chipW=158, chipH=33, gx=10, gy=9, lpadY=12, laneGap=15;
+  const innerX = padX + gutter + 176 + 14;
+  const perRow = Math.max(1, Math.floor((W - padX - innerX + gx)/(chipW + gx)));
+  let y = 40; const nodes = []; let body = '';
+  const drawLane = (l, o={}) => {
+    const rows = Math.ceil(l.items.length/perRow);
+    const h = lpadY*2 + rows*chipH + (rows-1)*gy;
+    const x = padX + gutter, w = W - padX - x;
+    const col = o.neutral ? 'var(--border-2)' : phaseColor(l.key);
+    const accent = o.neutral ? 'var(--muted)' : col;
+    body += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="13" style="fill:var(--surface-2);stroke:${col};stroke-opacity:${o.dashed?0.85:0.4}"${o.dashed?' stroke-dasharray="7 5"':''}/>`;
+    body += `<rect x="${x}" y="${y}" width="5" height="${h}" rx="2.5" style="fill:${col}"/>`;
+    body += `<text x="${x+18}" y="${y+24}" style="fill:var(--text);font-weight:700" font-size="13.5">${esc(l.title)}</text>`;
+    if(l.sub) body += `<text x="${x+18}" y="${y+41}" style="fill:var(--muted)" font-size="10.5">${esc(l.sub)}</text>`;
+    if(!o.neutral) body += `<text x="${x+18}" y="${y+h-11}" style="fill:${col};font-weight:800" font-size="10">${l.key}</text>`;
+    l.items.forEach((it,i)=>{
+      const r=Math.floor(i/perRow), c=i%perRow;
+      const cx=innerX + c*(chipW+gx), cy=y + lpadY + r*(chipH+gy);
+      const star = it.indexOf('★')>=0, stroke = star ? 'var(--brand)' : accent;
+      body += `<rect x="${cx}" y="${cy}" width="${chipW}" height="${chipH}" rx="9" style="fill:var(--surface);stroke:${stroke};stroke-opacity:${star?1:0.55}${star?';filter:url(#ecoGlow)':''}"/>`;
+      body += `<text x="${cx+chipW/2}" y="${cy+chipH/2+4}" text-anchor="middle" style="fill:var(--text)" font-size="10.8"${star?' font-weight="700"':''}>${esc(it)}</text>`;
+    });
+    nodes.push({cy:y + h/2, col});
+    y += h + laneGap;
+  };
+  ECO.lanes.forEach((l)=>drawLane(l));
+  drawLane(ECO.data,{neutral:true});
+  drawLane(ECO.external,{neutral:true,dashed:true});
+  const totalH = y - laneGap + 14;
+  const railX = padX + gutter/2;
+  const func = nodes.slice(0, ECO.lanes.length);
+  const dataNode = nodes[ECO.lanes.length], extNode = nodes[ECO.lanes.length+1];
+  let rail = `<line x1="${railX}" y1="${func[0].cy}" x2="${railX}" y2="${dataNode.cy}" style="stroke:var(--border-2)" stroke-width="2" marker-end="url(#ecoArr)"/>`;
+  rail += `<line x1="${railX}" y1="${dataNode.cy}" x2="${railX}" y2="${extNode.cy}" style="stroke:var(--border-2);stroke-dasharray:5 4" stroke-width="1.5"/>`;
+  func.forEach((n)=>{ rail += `<circle cx="${railX}" cy="${n.cy}" r="4.5" style="fill:var(--surface);stroke:${n.col}" stroke-width="2"/>`; });
+  rail += `<circle cx="${railX}" cy="${dataNode.cy}" r="4.5" style="fill:var(--surface);stroke:var(--muted)" stroke-width="2"/>`;
+  rail += `<circle cx="${railX}" cy="${extNode.cy}" r="4" style="fill:var(--surface);stroke:var(--muted)" stroke-width="1.5"/>`;
+  const head = `<text x="${padX}" y="23" style="fill:var(--text);font-weight:700" font-size="13.5">AICOS — AI Commerce OS</text>`
+    + `<text x="${W-padX}" y="23" text-anchor="end" style="fill:var(--muted)" font-size="11">Multi-tenant SaaS · shared DB + Postgres RLS · API-first</text>`;
+  const defs = `<defs><marker id="ecoArr" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M1,1 L8,4.5 L1,8 Z" style="fill:var(--muted)"/></marker>`
+    + `<filter id="ecoGlow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#6366f1" flood-opacity="0.55"/></filter></defs>`;
+  return `<svg viewBox="0 0 ${W} ${totalH}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">${defs}${head}${rail}${body}</svg>`;
+}
+$('#ecoDiagram').innerHTML = renderEcosystem();
+[['P0','Foundation'],['P1','Commerce'],['P2','AI'],['P3','Site'],['P4','Growth'],['P5','Scale']].forEach(([k,name])=>{
+  $('#ecoLegend').append(el('span','chip',`<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${phaseColor(k)};margin-right:6px"></span>${k} · ${name}`));
+});
 
 /* ---- Modules ---- */
 $('#modCount').textContent = `(${D.modules.length})`;
