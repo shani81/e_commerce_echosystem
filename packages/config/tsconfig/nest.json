@@ -13,6 +13,7 @@
     "rootDir": "src",
     "baseUrl": ".",
     "isolatedModules": false,
-    "incremental": false
+    "incremental": false,
+    "declaration": false
   }
 }

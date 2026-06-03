@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Exclude, Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 /**
@@ -20,12 +20,17 @@ export class PaginationDto {
   @Max(100)
   pageSize = 20;
 
+  // @Exclude() keeps class-transformer from trying to ASSIGN these getter-only
+  // props when a client passes ?skip=/?take= query params (which would throw a
+  // 500 "has only a getter"). The getters still work at runtime for the services.
   /** Prisma `skip` derived from page/pageSize. */
+  @Exclude()
   get skip(): number {
     return (this.page - 1) * this.pageSize;
   }
 
   /** Prisma `take` derived from pageSize. */
+  @Exclude()
   get take(): number {
     return this.pageSize;
   }

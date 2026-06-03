@@ -11,6 +11,12 @@ export const PERMISSIONS = {
   ROLE_WRITE: 'role:write',
   BILLING_READ: 'billing:read',
   BILLING_WRITE: 'billing:write',
+  CATALOG_READ: 'catalog:read',
+  CATALOG_WRITE: 'catalog:write',
+  INVENTORY_READ: 'inventory:read',
+  INVENTORY_WRITE: 'inventory:write',
+  MEDIA_READ: 'media:read',
+  MEDIA_WRITE: 'media:write',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -30,8 +36,20 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.USER_WRITE,
     PERMISSIONS.ROLE_READ,
     PERMISSIONS.BILLING_READ,
+    PERMISSIONS.CATALOG_READ,
+    PERMISSIONS.CATALOG_WRITE,
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.INVENTORY_WRITE,
+    PERMISSIONS.MEDIA_READ,
+    PERMISSIONS.MEDIA_WRITE,
   ],
-  [RoleType.STORE_STAFF]: [PERMISSIONS.USER_READ],
+  [RoleType.STORE_STAFF]: [
+    PERMISSIONS.USER_READ,
+    PERMISSIONS.CATALOG_READ,
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.INVENTORY_WRITE,
+    PERMISSIONS.MEDIA_READ,
+  ],
 };
 
 /** Human-friendly default names for the seeded tenant roles. */

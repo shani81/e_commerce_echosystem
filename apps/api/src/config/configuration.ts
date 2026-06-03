@@ -43,6 +43,15 @@ export const envSchema = z.object({
   // --- Billing / Stripe (skeleton — verification wired later) ---------------
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+  // --- Object storage / S3-compatible (MinIO locally, S3/R2 in prod) --------
+  // Endpoint may be absent (e.g. in tests); presign throws a clear 503 then.
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().default('aicos-media'),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_FORCE_PATH_STYLE: z.string().default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -147,6 +156,16 @@ export function configuration() {
     stripe: {
       secretKey: env.STRIPE_SECRET_KEY,
       webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    },
+    s3: {
+      endpoint: env.S3_ENDPOINT,
+      region: env.S3_REGION,
+      bucket: env.S3_BUCKET,
+      accessKey: env.S3_ACCESS_KEY,
+      secretKey: env.S3_SECRET_KEY,
+      // String env -> boolean; any value other than "false" enables path-style
+      // addressing (required by MinIO and most S3-compatible stores).
+      forcePathStyle: env.S3_FORCE_PATH_STYLE !== 'false',
     },
   };
 }

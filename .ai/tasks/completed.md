@@ -3,6 +3,16 @@
 > Work finished. Append newest at top. We are in **PHASE 0**; everything completed so far is project bootstrap, research, and the analysis that precedes coding.
 > Last updated: 2026-06-03.
 
+## 2026-06-03 — Phase 1 · M1.1 Core Commerce (catalog + inventory + media APIs)
+
+| ID | Description | Evidence |
+|----|-------------|----------|
+| C1-001 | **Catalog** module — products/variants, categories (+tree), brands; publish (DRAFT→ACTIVE); product↔media images. Tenant-scoped (forTenant) + RBAC + per-tenant unique → 409. 20 endpoints. | `apps/api/src/catalog/**` |
+| C1-002 | **Inventory** module — locations, inventory items (computed `available`), stock adjustments (StockMovement ledger), low-stock alerts; negative-stock guard. 11 endpoints. | `apps/api/src/inventory/**` |
+| C1-003 | **Media** module — presigned S3/MinIO upload → confirm → get(download url) → delete over MediaAsset; `@aws-sdk/*` + S3 config. | `apps/api/src/media/**` |
+| C1-004 | Hardening: `?take`/`?skip` no longer 500 (PaginationDto getters `@Exclude`d); Nest tsconfig `declaration:false` (fixes TS2742 on Prisma return types); web/admin lint → shared flat config; `ui` empty-interface fixed; RBAC perms for catalog/inventory/media. | various |
+| C1-005 | **Verified live**: typecheck 14/14, lint 13/13, build 9/9, and a smoke test (signup → brand/category/product/variant → publish → list → location/inventory → adjust 100→95 → alerts → media presign → 401) **17/17 PASS** against live Postgres + MinIO. | smoke test |
+
 ## 2026-06-03 — Phase 0 foundation (M0.1 monorepo+infra · M0.2 RLS proven · M0.3/M0.4 cores)
 
 | ID | Description | Evidence / Artifact |

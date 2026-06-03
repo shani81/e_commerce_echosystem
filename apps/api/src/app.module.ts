@@ -15,6 +15,9 @@ import { BillingModule } from './billing/billing.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './metrics/http-metrics.interceptor';
+import { CatalogModule } from './catalog/catalog.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { MediaModule } from './media/media.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -74,6 +77,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     BillingModule,
     HealthModule,
     MetricsModule,
+    CatalogModule,
+    InventoryModule,
+    MediaModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
