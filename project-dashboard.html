@@ -281,20 +281,27 @@ const D = {
   scoreOrder: [["overall","Overall health"],["enterpriseReadiness","Enterprise readiness"],["architecture","Architecture"],["documentation","Documentation"],["scalability","Scalability"],["tenantIsolation","Tenant isolation"],["security","Security"],["uiux","UI / UX"],["performance","Performance"],["codeQuality","Code quality"]],
   scoreNote: "Phase 0 complete (🟢 GO for Phase 1): RLS isolation, RS256 auth, Stripe webhook verification & an observability baseline all verified. Perf/scale unproven under load (expected).",
   urls: [
-    ["Storefront (web)","http://localhost:3000"],
-    ["Admin dashboard","http://localhost:3100"],
-    ["API (NestJS)","http://localhost:4000"],
-    ["Queues / worker","http://localhost:4100"],
+    ["Storefront — home","http://localhost:3000"],
+    ["Storefront — shop (public)","http://localhost:3000/shop"],
+    ["Storefront — cart","http://localhost:3000/cart"],
+    ["Admin — login","http://localhost:3100/login"],
+    ["Admin — orders","http://localhost:3100/orders"],
+    ["Admin — payments (Connect)","http://localhost:3100/settings/connect"],
+    ["API base (NestJS)","http://localhost:4000/api/v1"],
+    ["API — health","http://localhost:4000/api/v1/health"],
+    ["Worker — health","http://localhost:4100/health"],
     ["Meilisearch","http://localhost:7700"],
     ["MinIO console","http://localhost:9300"],
-    ["Mailhog","http://localhost:8100"]
+    ["Mailhog (dev mail)","http://localhost:8100"]
   ],
   creds: [
-    ["Super Admin","superadmin@aicos.local","SuperAdmin!2026"],
-    ["Admin (demo store)","admin@aicos.local","Admin!2026"],
-    ["Postgres","aicos","aicos_dev_2026 · db aicos@5440"],
+    ["Super Admin (admin app)","superadmin@aicos.local","SuperAdmin!2026"],
+    ["Store Owner — demo (admin app)","admin@aicos.local","Admin!2026"],
+    ["Postgres — owner","aicos","aicos_dev_2026 · aicos@localhost:5440"],
+    ["Postgres — app role (RLS)","aicos_app","aicos_app_dev_2026"],
     ["MinIO","minio","minio_dev_2026"],
-    ["Meili master key","—","aicos_dev_meili_master_2026"]
+    ["Meili master key","—","aicos_dev_meili_master_2026"],
+    ["Redis","—","no auth · localhost:6400"]
   ],
   phases: [
     {key:"P0",name:"Foundation",goal:"Monorepo, Docker infra, IAM + multi-tenancy, billing skeleton, design system, CI/CD, observability.",status:"In Progress",completion:90,eta:"✓ exit review GO",milestones:["✓ M0.1 Monorepo + infra + CI","✓ M0.2 Prisma + RLS isolation test","✓ M0.3 Auth (RS256) + RBAC + tenant ctx","✓ M0.4 Billing skeleton + Stripe webhooks","✓ M0.5 Design system + observability"]},
