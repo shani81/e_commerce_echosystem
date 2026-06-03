@@ -57,21 +57,34 @@ export default function ShopPage() {
               {store?.name ?? 'Store'}
             </span>
           </Link>
-          <form
-            className="ml-auto w-full sm:w-80"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSubmitted(term.trim());
-            }}
-          >
-            <input
-              type="search"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              placeholder="Search products…"
-              className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus-visible:border-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20"
-            />
-          </form>
+          <div className="ml-auto flex w-full items-center gap-3 sm:w-auto">
+            <form
+              className="w-full sm:w-80"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSubmitted(term.trim());
+              }}
+            >
+              <input
+                type="search"
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                placeholder="Search products…"
+                className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus-visible:border-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20"
+              />
+            </form>
+            <Link
+              href="/cart"
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="h-4 w-4">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 4h12" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="9" cy="20" r="1" />
+                <circle cx="17" cy="20" r="1" />
+              </svg>
+              Cart
+            </Link>
+          </div>
         </div>
       </header>
 

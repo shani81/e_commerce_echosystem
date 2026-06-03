@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Badge, Button } from '@aicos/ui';
-import { formatCents, getProduct, type ProductDetail } from '@/lib/storefront-api';
+import { addToCart, formatCents, getProduct, type ProductDetail } from '@/lib/storefront-api';
 
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
@@ -13,13 +13,22 @@ export default function ProductPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
+  const [selectedVariant, setSelectedVariant] = React.useState<string | null>(null);
+  const [adding, setAdding] = React.useState(false);
+  const [added, setAdded] = React.useState(false);
+  const [addError, setAddError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (!slug) return;
     let active = true;
     setLoading(true);
     setError(null);
     getProduct(slug)
-      .then((p) => active && setProduct(p))
+      .then((p) => {
+        if (!active) return;
+        setProduct(p);
+        setSelectedVariant(p.variants[0]?.id ?? null);
+      })
       .catch((e: Error) => active && setError(e.message))
       .finally(() => active && setLoading(false));
     return () => {
@@ -31,12 +40,30 @@ export default function ProductPage() {
     ? Math.min(...product.variants.map((v) => v.priceCents))
     : null;
 
+  async function onAdd() {
+    if (!selectedVariant) return;
+    setAdding(true);
+    setAddError(null);
+    setAdded(false);
+    try {
+      await addToCart(selectedVariant, 1);
+      setAdded(true);
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : 'Could not add to cart');
+    } finally {
+      setAdding(false);
+    }
+  }
+
   return (
     <main className="min-h-dvh bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center gap-2 px-6 py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Link href="/shop" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
             ← Back to shop
+          </Link>
+          <Link href="/cart" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            Cart
           </Link>
         </div>
       </header>
@@ -75,23 +102,59 @@ export default function ProductPage() {
                     Options
                   </h2>
                   <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
-                    {product.variants.map((v) => (
-                      <li key={v.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                        <span className="text-neutral-700">
-                          {v.title}
-                          {v.sku ? <span className="ml-2 text-xs text-neutral-400">{v.sku}</span> : null}
-                        </span>
-                        <span className="font-medium text-neutral-900">{formatCents(v.priceCents)}</span>
-                      </li>
-                    ))}
+                    {product.variants.map((v) => {
+                      const selected = v.id === selectedVariant;
+                      return (
+                        <li key={v.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedVariant(v.id);
+                              setAdded(false);
+                            }}
+                            className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
+                              selected ? 'bg-brand-50' : 'hover:bg-neutral-50'
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 text-neutral-700">
+                              <span
+                                aria-hidden
+                                className={`inline-block h-3.5 w-3.5 rounded-full border ${
+                                  selected ? 'border-brand-600 bg-brand-600' : 'border-neutral-300'
+                                }`}
+                              />
+                              {v.title}
+                              {v.sku ? <span className="text-xs text-neutral-400">{v.sku}</span> : null}
+                            </span>
+                            <span className="font-medium text-neutral-900">
+                              {formatCents(v.priceCents)}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ) : null}
 
-              <div className="mt-8">
-                <Button size="lg" disabled>
-                  Add to cart (coming in M1.3)
+              {addError ? (
+                <p role="alert" className="mt-4 text-sm font-medium text-red-700">
+                  {addError}
+                </p>
+              ) : null}
+
+              <div className="mt-8 flex items-center gap-3">
+                <Button size="lg" onClick={onAdd} isLoading={adding} disabled={!selectedVariant}>
+                  Add to cart
                 </Button>
+                {added ? (
+                  <Link
+                    href="/cart"
+                    className="text-sm font-medium text-brand-700 hover:text-brand-800"
+                  >
+                    Added ✓ — View cart
+                  </Link>
+                ) : null}
               </div>
             </div>
           </div>

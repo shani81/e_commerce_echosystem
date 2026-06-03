@@ -16,14 +16,16 @@ export class StripeService {
   private readonly logger = new Logger(StripeService.name);
   private readonly stripe: Stripe;
   private readonly webhookSecret?: string;
+  private readonly apiKeyConfigured: boolean;
 
   constructor(config: ConfigService) {
     // The API key is NOT used to verify webhook signatures (`constructEvent`
     // only needs the webhook signing secret), but the SDK constructor requires a
-    // non-empty key. Real API calls land in the billing phase.
+    // non-empty key.
     // `||` (not `??`): STRIPE_SECRET_KEY may be present-but-empty in .env, and
     // the Stripe SDK constructor throws on an empty key.
     const apiKey = config.get<string>('stripe.secretKey') || 'sk_unconfigured';
+    this.apiKeyConfigured = apiKey !== 'sk_unconfigured';
     this.stripe = new Stripe(apiKey);
     this.webhookSecret = config.get<string>('stripe.webhookSecret');
   }
@@ -32,8 +34,26 @@ export class StripeService {
     return this.stripe;
   }
 
+  /** True when STRIPE_WEBHOOK_SECRET is set (inbound webhooks can be verified). */
   get isConfigured(): boolean {
     return Boolean(this.webhookSecret);
+  }
+
+  /**
+   * True when a real STRIPE_SECRET_KEY is set (outbound API calls — Checkout
+   * sessions, Connect accounts, refunds — will work). Services guard on this to
+   * degrade gracefully (503) instead of calling Stripe with `sk_unconfigured`.
+   */
+  get isApiConfigured(): boolean {
+    return this.apiKeyConfigured;
+  }
+
+  /** Throw a 503 when outbound Stripe calls are not configured. */
+  assertApiConfigured(): void {
+    if (!this.apiKeyConfigured) {
+      this.logger.error('STRIPE_SECRET_KEY is not configured');
+      throw new ServiceUnavailableException('Stripe is not configured');
+    }
   }
 
   /**

@@ -1,7 +1,20 @@
 # AICOS — Completed
 
 > Work finished. Append newest at top. We are in **PHASE 1 — Core Commerce**; Phase 0 (foundation) is complete (exit review GO).
-> Last updated: 2026-06-03.
+> Last updated: 2026-06-04.
+
+## 2026-06-04 — Phase 1 · M1.3 Checkout, payments & Stripe Connect
+
+| ID | Description | Evidence |
+|----|-------------|----------|
+| C1-012 | **Cart (public)** — token-addressed anonymous cart with live re-pricing + DENY-policy stock guard. `/storefront/:slug/cart` create/add/set-qty/remove. | `apps/api/src/cart/**` |
+| C1-013 | **Checkout (public)** — cart → DRAFT order + Stripe Checkout Session; Connect destination charge + `application_fee_amount` when onboarded (else direct charge); `automatic_tax` when enabled; rollback on session failure; 503 when unconfigured. | `apps/api/src/checkout/**` |
+| C1-014 | **Order lifecycle (worker)** — `checkout.session.completed`→PAID + Payment + inventory decrement (SALE ledger) + cart converted; `payment_intent.payment_failed`; `charge.refunded`; `account.updated`. Idempotent (Redis marker + Stripe-id upserts). | `apps/worker/src/queues/billing.processor.ts` |
+| C1-015 | **Stripe Connect onboarding** — Express account create + hosted AccountLink + capability status sync. | `apps/api/src/connect/**` |
+| C1-016 | **Orders admin** — list + detail; refund with `reverse_transfer`. | `apps/api/src/orders/**` |
+| C1-017 | **RBAC + config** — `order:* / payment:* / customer:*` permissions; commerce config (fee bps, tax, checkout + Connect URLs); `.env.example`. | `permissions.ts`, `configuration.ts`, `.env.example` |
+| C1-018 | **Web + admin UI** — add-to-cart, `/cart`, Stripe redirect, success/cancel; admin Orders page + Payments/Connect settings page (nav activated). | `apps/web`, `apps/admin` |
+| C1-019 | **Verified** — contract smoke 19/19 (cart lifecycle, 503 degradation, synthetic `checkout.session.completed` → order PAID + Payment SUCCEEDED + stock 10→8 + SALE movement). typecheck 14/14, lint 13/13, build 9/9. Live Stripe smoke deferred (needs test keys + `stripe listen`). | smoke |
 
 ## 2026-06-03 — Phase 1 · M1.2 Search & storefront (Meilisearch + public browse)
 

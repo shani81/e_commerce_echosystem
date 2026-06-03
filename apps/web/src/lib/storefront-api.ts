@@ -39,20 +39,55 @@ export interface ProductDetail {
   images: { id: string; altText: string | null }[];
 }
 
+// --- Cart -------------------------------------------------------------------
+export interface CartLine {
+  variantId: string;
+  productSlug: string;
+  productTitle: string;
+  variantTitle: string;
+  sku: string | null;
+  unitPriceCents: number;
+  quantity: number;
+  lineTotalCents: number;
+}
+export interface CartView {
+  token: string;
+  currency: string;
+  items: CartLine[];
+  subtotalCents: number;
+  itemCount: number;
+}
+export interface CheckoutResponse {
+  orderId: string;
+  orderNumber: string;
+  sessionId: string;
+  url: string | null;
+}
+
+async function errorMessage(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { message?: string | string[] };
+    if (body?.message) return Array.isArray(body.message) ? body.message.join(', ') : body.message;
+  } catch {
+    /* non-JSON */
+  }
+  return `Request failed (${res.status})`;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: 'no-store' });
-  if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const body = (await res.json()) as { message?: string | string[] };
-      if (body?.message) {
-        message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-      }
-    } catch {
-      /* non-JSON error */
-    }
-    throw new Error(message);
-  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return res.json() as Promise<T>;
+}
+
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<T>;
 }
 
@@ -67,4 +102,65 @@ export const getProduct = (slug: string) =>
 export function formatCents(cents: number | null, currency = 'USD'): string {
   if (cents == null) return '—';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+}
+
+// --- Cart token (kept in localStorage; the cart is anonymous + token-addressed)
+const CART_TOKEN_KEY = 'aicos.cart.token';
+export function getCartToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(CART_TOKEN_KEY);
+}
+export function setCartToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (token) window.localStorage.setItem(CART_TOKEN_KEY, token);
+  else window.localStorage.removeItem(CART_TOKEN_KEY);
+}
+
+/** Read the current cart, or null when there is no (live) cart. */
+export async function getCart(): Promise<CartView | null> {
+  const token = getCartToken();
+  if (!token) return null;
+  const res = await fetch(`${BASE}/cart/${token}`, { cache: 'no-store' });
+  if (res.status === 404) {
+    setCartToken(null);
+    return null;
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return res.json() as Promise<CartView>;
+}
+
+/** Add a variant to the cart, creating one (and persisting its token) if needed. */
+export async function addToCart(variantId: string, quantity = 1): Promise<CartView> {
+  let token = getCartToken();
+  if (!token) {
+    const created = await send<CartView>('POST', '/cart');
+    token = created.token;
+    setCartToken(token);
+  }
+  try {
+    return await send<CartView>('POST', `/cart/${token}/items`, { variantId, quantity });
+  } catch (err) {
+    // Token referenced a stale/checked-out cart — start a fresh one and retry once.
+    if (err instanceof Error && /not found|checked out/i.test(err.message)) {
+      const created = await send<CartView>('POST', '/cart');
+      setCartToken(created.token);
+      return send<CartView>('POST', `/cart/${created.token}/items`, { variantId, quantity });
+    }
+    throw err;
+  }
+}
+
+export async function setCartQuantity(variantId: string, quantity: number): Promise<CartView> {
+  const token = getCartToken();
+  if (!token) throw new Error('No cart');
+  return send<CartView>('PATCH', `/cart/${token}/items/${variantId}`, { quantity });
+}
+
+export const removeFromCart = (variantId: string) => setCartQuantity(variantId, 0);
+
+/** Convert the cart to an order and return the Stripe Checkout Session. */
+export async function checkout(email?: string): Promise<CheckoutResponse> {
+  const token = getCartToken();
+  if (!token) throw new Error('Your cart is empty');
+  return send<CheckoutResponse>('POST', '/checkout', { token, ...(email ? { email } : {}) });
 }
