@@ -1,0 +1,15 @@
+# Decision Log
+
+Chronological log of concrete decisions. Strategic/architectural rationale lives in `.ai/master-brain/strategic-decisions.md`; this is the running ledger.
+
+| # | Date | Decision | Reason | Alternatives | Impact |
+|---|------|----------|--------|--------------|--------|
+| D-001 | 2026-06-03 | **Business domain = general e-commerce OS** ("AI Commerce OS / AICOS") | PROJECT_PROPOSAL controls business scope and defines an e-commerce platform; the restaurant examples in CLAUDE_CODE_BASELINE are illustrative only. Conflict rule: proposal wins on business. | Restaurant-only platform | All modules/personas/revenue framed for any physical store |
+| D-002 | 2026-06-03 | **Backend framework = NestJS** | Proposal explicitly specifies NestJS; baseline left framework unspecified. | Plain Express, Fastify | Modular, DI-driven, controller→service→repository |
+| D-003 | 2026-06-03 | **Search = Meilisearch** | Simpler ops, excellent DX, fast typo-tolerant search; proposal allowed Meilisearch *or* Typesense. | Typesense, Elasticsearch | One less moving part; revisit at very large scale |
+| D-004 | 2026-06-03 | **Local object storage = MinIO**, prod = Cloudflare R2 / AWS S3 | S3-compatible everywhere; MinIO gives local parity. | Local disk | Same SDK/code path local & prod |
+| D-005 | 2026-06-03 | **Default AI provider = Anthropic Claude** behind a provider-abstraction layer | We can swap to OpenAI/Gemini with no code change (proposal requirement). | Hard-wire one provider | Vendor flexibility, cost routing, fallback |
+| D-006 | 2026-06-03 | **Multi-tenancy = shared DB + shared schema + `tenant_id` + Postgres RLS** | Best cost/scale balance for "millions of stores"; strong isolation via RLS. | Schema-per-tenant, DB-per-tenant | Schema-per-tenant reserved for large enterprise tenants later |
+| D-007 | 2026-06-03 | **Infra dockerized, apps run on host (pnpm)** | Baseline rule: dockerize infrastructure only unless requested. | Dockerize everything | Faster local dev loop |
+| D-008 | 2026-06-03 | **Infra host ports remapped & locked** (pg 5440, redis 6400, meili 7700, minio 9200/9300, mailhog 8100/1200) | Machine already runs Postgres/Redis/MinIO/Mailhog on defaults; auto-discovered free ports. | Reuse defaults (conflict) | No port conflicts; see `.ai/config/project-ports.json` |
+| D-009 | 2026-06-03 | **Plan before code** | Baseline startup rule: Analyze→Research→Plan→Design→Estimate→Implement. | Start coding immediately | This commit is planning-only; implementation gated on approval |

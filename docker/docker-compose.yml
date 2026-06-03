@@ -1,0 +1,78 @@
+# AICOS local infrastructure (infrastructure only — apps run on the host via pnpm).
+# Host ports are LOCKED in .ai/config/project-ports.json (auto-discovered as free on this machine).
+# Start:  docker compose -f docker/docker-compose.yml --env-file .env up -d
+name: aicos
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aicos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aicos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aicos_dev_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-aicos}
+    ports:
+      - "5440:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aicos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: aicos-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6400:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: aicos-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-aicos_dev_meili_master_2026}
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilidata:/meili_data
+
+  minio:
+    image: minio/minio:latest
+    container_name: aicos-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_dev_2026}
+    ports:
+      - "9200:9000"   # S3 API
+      - "9300:9001"   # Console
+    volumes:
+      - miniodata:/data
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: aicos-mailhog
+    restart: unless-stopped
+    ports:
+      - "8100:8025"   # Web UI
+      - "1200:1025"   # SMTP
+
+volumes:
+  pgdata:
+  redisdata:
+  meilidata:
+  miniodata:

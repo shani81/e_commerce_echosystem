@@ -1,0 +1,21 @@
+{
+  "$comment": "AUTHORITATIVE port reservations for AICOS. Ports were auto-discovered as free on this machine and are LOCKED. Do not change randomly. App ports are conflict-free; infra ports were remapped because the machine already runs Postgres/Redis/MinIO/Mailhog on their defaults.",
+  "lockedAt": "2026-06-03",
+  "host": "localhost",
+  "apps": {
+    "web":    { "port": 3000, "url": "http://localhost:3000", "description": "Customer storefront (Next.js)" },
+    "admin":  { "port": 3100, "url": "http://localhost:3100", "description": "Admin dashboard (Next.js)" },
+    "api":    { "port": 4000, "url": "http://localhost:4000", "description": "Backend API (NestJS)" },
+    "worker": { "port": 4100, "url": "http://localhost:4100", "description": "AI worker / BullMQ queue dashboard" }
+  },
+  "infra": {
+    "postgres":    { "hostPort": 5440, "containerPort": 5432, "description": "PostgreSQL (remapped from 5432 — in use)" },
+    "redis":       { "hostPort": 6400, "containerPort": 6379, "description": "Redis (remapped from 6379 — in use)" },
+    "meilisearch": { "hostPort": 7700, "containerPort": 7700, "url": "http://localhost:7700", "description": "Meilisearch search engine" },
+    "minio_api":     { "hostPort": 9200, "containerPort": 9000, "url": "http://localhost:9200", "description": "MinIO S3 API (remapped from 9000 — in use)" },
+    "minio_console": { "hostPort": 9300, "containerPort": 9001, "url": "http://localhost:9300", "description": "MinIO console (remapped from 9001 — in use)" },
+    "mailhog_http":  { "hostPort": 8100, "containerPort": 8025, "url": "http://localhost:8100", "description": "Mailhog web UI (remapped from 8025 — in use)" },
+    "mailhog_smtp":  { "hostPort": 1200, "containerPort": 1025, "description": "Mailhog SMTP (remapped from 1025 — in use)" },
+    "pgadmin":     { "hostPort": 5050, "containerPort": 80, "url": "http://localhost:5050", "description": "pgAdmin (optional)" }
+  }
+}

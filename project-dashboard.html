@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AICOS — Executive Project Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        colors: {
+          ink: { 950:'#0a0b0f', 900:'#0e1015', 850:'#13161d', 800:'#181c25', 700:'#222734', 600:'#2d3342' },
+          brand: { 400:'#7c9bff', 500:'#5b78f6', 600:'#4259e0' },
+          ok:'#34d399', warn:'#fbbf24', bad:'#f87171', info:'#60a5fa', mute:'#8b93a7'
+        }
+      } }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',sans-serif}
+    .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-thumb{background:#2d3342;border-radius:6px}
+    ::-webkit-scrollbar-track{background:#0e1015}
+    .card{background:linear-gradient(180deg,#13161d,#0f1218);border:1px solid #222734;border-radius:14px}
+    .chip{font-size:11px;line-height:1;padding:4px 8px;border-radius:999px;border:1px solid #2d3342}
+    .nav-link{color:#8b93a7;font-size:13px;padding:6px 10px;border-radius:8px}
+    .nav-link:hover{color:#e6e9f0;background:#181c25}
+    details>summary{list-style:none;cursor:pointer}
+    details>summary::-webkit-details-marker{display:none}
+    .glow{box-shadow:0 0 0 1px rgba(91,120,246,.25),0 8px 30px -12px rgba(91,120,246,.45)}
+  </style>
+</head>
+<body class="bg-ink-950 text-slate-200 antialiased">
+
+<!-- ===================== STICKY HEADER ===================== -->
+<header class="sticky top-0 z-40 backdrop-blur bg-ink-950/85 border-b border-ink-700">
+  <div class="max-w-7xl mx-auto px-5 py-3 flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-3 mr-auto">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 grid place-items-center font-extrabold text-white glow">A</div>
+      <div>
+        <div class="font-bold text-white leading-tight">AI Commerce OS <span class="text-mute font-medium">· AICOS</span></div>
+        <div class="text-[11px] text-mute">Film your shelves → Publish your store → live in &lt;15 min</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="chip" style="border-color:#2d3342;color:#8b93a7">Updated <span id="ts" class="text-slate-300 mono"></span></span>
+      <span id="phaseChip" class="chip"></span>
+      <span id="healthChip" class="chip"></span>
+      <span id="readyChip" class="chip"></span>
+    </div>
+  </div>
+  <nav class="max-w-7xl mx-auto px-4 pb-2 flex flex-wrap gap-1">
+    <a class="nav-link" href="#exec">Executive</a>
+    <a class="nav-link" href="#access">Local Access</a>
+    <a class="nav-link" href="#roadmap">Roadmap</a>
+    <a class="nav-link" href="#ecosystem">Ecosystem</a>
+    <a class="nav-link" href="#modules">Modules</a>
+    <a class="nav-link" href="#data">Data &amp; API</a>
+    <a class="nav-link" href="#ai">AI</a>
+    <a class="nav-link" href="#integrations">Integrations</a>
+    <a class="nav-link" href="#revenue">Revenue</a>
+    <a class="nav-link" href="#risks">Risks</a>
+    <a class="nav-link" href="#quality">Quality</a>
+    <a class="nav-link" href="#activity">Activity</a>
+  </nav>
+</header>
+
+<main class="max-w-7xl mx-auto px-5 py-6 space-y-10">
+
+  <!-- ===================== EXECUTIVE ===================== -->
+  <section id="exec" class="scroll-mt-28">
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="card p-5 lg:col-span-2">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-white font-bold text-lg">Executive Summary</h2>
+          <span class="chip" style="border-color:#4259e0;color:#7c9bff">Phase 0 · Planning</span>
+        </div>
+        <p id="northStar" class="text-sm text-slate-300/90 leading-relaxed"></p>
+        <div class="grid sm:grid-cols-4 gap-3 mt-4" id="execStats"></div>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-white font-semibold mb-3">Health &amp; Readiness</h3>
+        <div id="scoreBars" class="space-y-2.5"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== LOCAL DEV ACCESS ===================== -->
+  <section id="access" class="scroll-mt-28">
+    <details open class="card p-5">
+      <summary class="flex items-center justify-between">
+        <h2 class="text-white font-bold text-lg">🔐 Local Dev Access <span class="text-mute text-xs font-normal">(this machine only — safe to store per project note)</span></h2>
+        <span class="text-mute text-xs">click to toggle</span>
+      </summary>
+      <div class="grid md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <div class="text-xs uppercase tracking-wide text-mute mb-2">URLs</div>
+          <div id="urls" class="space-y-1.5 text-sm mono"></div>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wide text-mute mb-2">Credentials</div>
+          <div id="creds" class="space-y-1.5 text-sm mono"></div>
+        </div>
+      </div>
+      <p class="text-[11px] text-mute mt-3">Ports auto-discovered as free and locked in <span class="mono text-slate-400">.ai/config/project-ports.json</span> (infra remapped — this machine already runs Postgres/Redis/MinIO/Mailhog on defaults).</p>
+    </details>
+  </section>
+
+  <!-- ===================== ROADMAP ===================== -->
+  <section id="roadmap" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">Roadmap &amp; Milestones</h2>
+    <div class="card p-5 overflow-x-auto">
+      <div id="roadmapSvg" style="min-width:920px"></div>
+    </div>
+    <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4" id="phaseCards"></div>
+  </section>
+
+  <!-- ===================== ECOSYSTEM ===================== -->
+  <section id="ecosystem" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">Ecosystem Overview</h2>
+    <div class="card p-5 overflow-x-auto">
+      <pre id="ecoTree" class="mono text-[12.5px] leading-6 text-slate-300"></pre>
+    </div>
+  </section>
+
+  <!-- ===================== MODULES ===================== -->
+  <section id="modules" class="scroll-mt-28">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-white font-bold text-lg">Modules <span id="modCount" class="text-mute text-sm font-normal"></span></h2>
+      <div class="flex gap-1.5 flex-wrap" id="phaseFilter"></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" id="moduleGrid"></div>
+  </section>
+
+  <!-- ===================== DATA & API ===================== -->
+  <section id="data" class="scroll-mt-28 grid lg:grid-cols-2 gap-4">
+    <div class="card p-5">
+      <h2 class="text-white font-bold text-lg mb-1">Database</h2>
+      <p class="text-xs text-mute mb-3">Multi-tenant: shared DB + shared schema + <span class="mono">tenant_id</span> + Postgres RLS (FORCE)</p>
+      <div id="dbStat" class="mb-3"></div>
+      <div id="dbModules" class="space-y-2 text-sm"></div>
+    </div>
+    <div class="card p-5">
+      <h2 class="text-white font-bold text-lg mb-1">API Surface</h2>
+      <p class="text-xs text-mute mb-3">REST · <span class="mono">/api/v1</span> · JWT + tenant context · OpenAPI</p>
+      <div id="apiStat" class="mb-3"></div>
+      <div id="apiGroups" class="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]"></div>
+    </div>
+  </section>
+
+  <!-- ===================== AI ===================== -->
+  <section id="ai" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">AI Intelligence</h2>
+    <div class="grid lg:grid-cols-2 gap-4">
+      <div class="card p-5">
+        <h3 class="text-white font-semibold mb-1">Flagship: Video → Catalog Pipeline</h3>
+        <p class="text-xs text-mute mb-3">12 stages · Gemini-first + Claude fallback · mandatory human gate · target ≥70% drafts ≥0.65 confidence</p>
+        <ol id="pipeline" class="space-y-1.5 text-[13px]"></ol>
+      </div>
+      <div class="card p-5">
+        <h3 class="text-white font-semibold mb-3">Specialized AI Agents <span id="agentCount" class="text-mute text-xs font-normal"></span></h3>
+        <div id="agents" class="space-y-1.5 text-[13px] max-h-[520px] overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== INTEGRATIONS ===================== -->
+  <section id="integrations" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">Integrations <span id="intCount" class="text-mute text-sm font-normal"></span></h2>
+    <div id="intGroups" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+  </section>
+
+  <!-- ===================== REVENUE ===================== -->
+  <section id="revenue" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">Revenue &amp; Pricing</h2>
+    <div class="grid lg:grid-cols-5 gap-3 mb-4" id="pricing"></div>
+    <div class="grid md:grid-cols-2 gap-3" id="revStreams"></div>
+  </section>
+
+  <!-- ===================== RISKS ===================== -->
+  <section id="risks" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">Risk Register <span id="riskCount" class="text-mute text-sm font-normal"></span></h2>
+    <div class="card overflow-hidden">
+      <table class="w-full text-[13px]">
+        <thead class="text-mute text-left border-b border-ink-700">
+          <tr><th class="py-2.5 px-4">Risk</th><th class="px-3">Category</th><th class="px-3">Sev</th><th class="px-3">Prob</th><th class="px-4 hidden lg:table-cell">Mitigation</th></tr>
+        </thead>
+        <tbody id="riskRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== QUALITY / PLANNING QA ===================== -->
+  <section id="quality" class="scroll-mt-28 grid lg:grid-cols-2 gap-4">
+    <div class="card p-5">
+      <h2 class="text-white font-bold text-lg mb-1">Planning QA — Strengths</h2>
+      <p class="text-xs text-mute mb-3">From the automated completeness &amp; consistency critic</p>
+      <ul id="strengths" class="space-y-1.5 text-[13px]"></ul>
+    </div>
+    <div class="card p-5">
+      <h2 class="text-white font-bold text-lg mb-1">Reconciliation Actions</h2>
+      <p class="text-xs text-mute mb-3">Critic-flagged fixes applied to keep the plan internally consistent</p>
+      <ul id="reconcile" class="space-y-1.5 text-[13px]"></ul>
+      <div class="mt-3 text-xs text-mute">Research &amp; intelligence assets: <span class="text-slate-300" id="intel"></span></div>
+    </div>
+  </section>
+
+  <!-- ===================== ACTIVITY ===================== -->
+  <section id="activity" class="scroll-mt-28">
+    <h2 class="text-white font-bold text-lg mb-3">Activity Timeline</h2>
+    <div class="card p-5"><ol id="timeline" class="relative border-l border-ink-700 ml-2 space-y-4"></ol></div>
+  </section>
+
+  <footer class="text-center text-xs text-mute py-6">
+    AICOS executive dashboard · generated by the AICOS startup workflow · source of truth: <span class="mono">PROJECT_PROPOSAL.md</span> + <span class="mono">CLAUDE_CODE_BASELINE.md</span> · strategic brain in <span class="mono">.ai/</span>
+  </footer>
+</main>
+
+<script>
+/* ============================ DATA ============================ */
+const D = {
+  lastUpdated: "2026-06-03",
+  phase: "Phase 0 — Foundation (planning)",
+  northStar: "A non-technical physical-store owner records a short video of their shelves, uploads it, AI extracts the full catalog (names, prices, variants, images, SEO) with per-field confidence, the owner reviews and clicks Publish, and a complete operational online store goes live in under 15 minutes. AICOS is a general e-commerce operating system for any physical store.",
+  stats: [
+    {k:"Modules", v:"24", s:"across 6 phases"},
+    {k:"DB models", v:"54→59", s:"+5 P1-critical"},
+    {k:"API endpoints", v:"317", s:"26 module groups"},
+    {k:"AI agents", v:"12", s:"+ 12-stage pipeline"}
+  ],
+  scores: {architecture:60, documentation:65, scalability:35, tenantIsolation:30, security:25, enterpriseReadiness:22, uiux:20, performance:10, codeQuality:8, overall:24},
+  scoreOrder: [["overall","Overall health"],["enterpriseReadiness","Enterprise readiness"],["architecture","Architecture"],["documentation","Documentation"],["scalability","Scalability"],["tenantIsolation","Tenant isolation"],["security","Security"],["uiux","UI / UX"],["performance","Performance"],["codeQuality","Code quality"]],
+  scoreNote: "Honest design-stage scores: architecture & docs lead; code/perf near zero (no implementation yet).",
+  urls: [
+    ["Storefront (web)","http://localhost:3000"],
+    ["Admin dashboard","http://localhost:3100"],
+    ["API (NestJS)","http://localhost:4000"],
+    ["Queues / worker","http://localhost:4100"],
+    ["Meilisearch","http://localhost:7700"],
+    ["MinIO console","http://localhost:9300"],
+    ["Mailhog","http://localhost:8100"]
+  ],
+  creds: [
+    ["Super Admin","superadmin@aicos.local","SuperAdmin!2026"],
+    ["Admin (demo store)","admin@aicos.local","Admin!2026"],
+    ["Postgres","aicos","aicos_dev_2026 · db aicos@5440"],
+    ["MinIO","minio","minio_dev_2026"],
+    ["Meili master key","—","aicos_dev_meili_master_2026"]
+  ],
+  phases: [
+    {key:"P0",name:"Foundation",goal:"Monorepo, Docker infra, IAM + multi-tenancy, billing skeleton, design system, CI/CD, observability.",status:"In Progress",completion:15,eta:"→ 2026-08-12",milestones:["M0.1 Monorepo + infra + CI","M0.2 Prisma + RLS isolation test","M0.3 Auth + RBAC + tenant ctx","M0.4 Billing skeleton + Stripe webhooks","M0.5 Design system + observability"]},
+    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"Planned",completion:0,eta:"→ 2026-12-09",milestones:["M1.1 Catalog + inventory + media","M1.2 Meili + storefront browse","M1.3 Stripe Checkout + Connect + tax","M1.4 Shipping (Shippo) + notifications","M1.5 Customer portal + returns","M1.6 GDPR DSAR + import"]},
+    {key:"P2",name:"The Magic (AI Extraction)",goal:"AI provider abstraction, flagship video→catalog pipeline, product creation agent, human verification, AI content + SEO.",status:"Planned",completion:0,eta:"→ 2027-03-31 ⚠ highest uncertainty",milestones:["M2.1 ai-core + usage + fallback","M2.2 Ingest + frames + ZXing zero-cost","M2.3 Gemini + Claude + pgvector dedup","M2.4 Human review UI + publish gate","M2.5 Content/SEO + credits; demo"]},
+    {key:"P3",name:"AI Store Builder",goal:"AI store generation from a name, website-cloning (inspiration, not copying), dynamic theme generation.",status:"Planned",completion:0,eta:"→ 2027-06-09",milestones:["M3.1 Theme engine + tokens","M3.2 Store builder from name","M3.3 Website cloning + guardrails","M3.4 Submit Google OAuth verification"]},
+    {key:"P4",name:"Growth & Intelligence",goal:"Google ecosystem sync, marketing/customer-service/pricing agents, analytics & BI, AI inventory forecasting.",status:"Planned",completion:0,eta:"→ 2027-10-06",milestones:["M4.1 Merchant API v1 + GBP","M4.2 GA4 + Search Console + GTM","M4.3 Marketing + CS agents","M4.4 Pricing + analytics + forecasting"]},
+    {key:"P5",name:"Scale & Enterprise",goal:"Automation engine, multi-region, Kubernetes, white-label, compliance (SOC2 path), advanced observability & security.",status:"Planned",completion:0,eta:"→ 2028-01-26",milestones:["M5.1 Automation engine","M5.2 K8s + KEDA + multi-region","M5.3 White-label + cost governance","M5.4 SOC2 path + WORM audit"]}
+  ],
+  modules: [
+    {key:"iam",name:"Identity, Auth, RBAC & Multi-Tenancy",phase:"P0",deps:[]},
+    {key:"billing",name:"SaaS Subscription Billing",phase:"P0",deps:["iam"]},
+    {key:"catalog",name:"Product Catalog & Variants",phase:"P1",deps:["iam","media"]},
+    {key:"inventory",name:"Inventory Management",phase:"P1",deps:["catalog"]},
+    {key:"orders",name:"Order Management",phase:"P1",deps:["catalog","inventory","customers"]},
+    {key:"payments",name:"Payments (Stripe)",phase:"P1",deps:["orders","iam","billing"]},
+    {key:"shipping",name:"Shipping & Fulfillment",phase:"P1",deps:["orders"]},
+    {key:"customers",name:"Customer Management & Portal",phase:"P1",deps:["iam","orders"]},
+    {key:"storefront",name:"Storefront (customer web)",phase:"P1",deps:["catalog","inventory","search","payments","media"]},
+    {key:"admin",name:"Admin Dashboard",phase:"P1",deps:["iam","catalog","orders","billing"]},
+    {key:"search",name:"Search (Meilisearch)",phase:"P1",deps:["catalog"]},
+    {key:"media",name:"Media & Storage",phase:"P1",deps:["iam"]},
+    {key:"notifications",name:"Notifications (email/chat)",phase:"P1",deps:["iam"]},
+    {key:"ai-core",name:"AI Provider Abstraction & Orchestration",phase:"P2",deps:["iam","billing"]},
+    {key:"ai-extraction",name:"AI Product Extraction Engine ★",phase:"P2",deps:["ai-core","media","catalog","inventory"]},
+    {key:"content",name:"AI Content Generation",phase:"P2",deps:["ai-core","catalog"]},
+    {key:"store-builder",name:"AI Store Builder + Website Cloning",phase:"P3",deps:["ai-core","catalog","theme-engine","content"]},
+    {key:"theme-engine",name:"AI Theme Generation",phase:"P3",deps:["ai-core","storefront"]},
+    {key:"google",name:"Google Ecosystem Integration",phase:"P4",deps:["iam","catalog","storefront","analytics"]},
+    {key:"marketing",name:"AI Marketing Agent",phase:"P4",deps:["ai-core","content","analytics","customers"]},
+    {key:"customer-service",name:"AI Customer Service Agent",phase:"P4",deps:["ai-core","orders","catalog","customers"]},
+    {key:"pricing",name:"AI Pricing Agent",phase:"P4",deps:["ai-core","catalog","analytics","inventory"]},
+    {key:"analytics",name:"Analytics & Business Intelligence",phase:"P4",deps:["orders","customers","catalog"]},
+    {key:"automation",name:"Automation Engine",phase:"P5",deps:["orders","inventory","notifications","ai-core"]}
+  ],
+  dbCount: 59,
+  dbModules: [
+    ["iam",6],["billing",5],["catalog",9],["inventory",3],["customers",2],["orders","4 (+Return,ReturnItem)"],
+    ["payments","4 (+ConnectAccount,Dispute,DisputeEvidence)"],["shipping",1],["media",1],
+    ["ai-extraction",4],["ai-core",2],["theme-engine",1],["search",1],["notifications",1],
+    ["google",2],["marketing",1],["analytics",1],["automation",2],["cross-cutting",4]
+  ],
+  apiCount: 317,
+  apiGroups: ["iam","billing","catalog","inventory","orders","payments","shipping","customers","storefront","admin","search","media","notifications","ai-core","ai-extraction ★","content","store-builder","theme-engine","google","marketing","customer-service","pricing","analytics","automation","webhooks","meta"],
+  pipeline: [
+    ["1 Upload & Validate","Pre-signed multipart to R2/MinIO; ≤20min, ≥1080p; create ExtractionJob; photo-batch fallback"],
+    ["2 Frame Sampling","FFmpeg hybrid sampling + blur gate + pHash dedup → 60-80 frames"],
+    ["3 Shelf Pre-filter","YOLOv8-nano drops junk frames, crops product/price regions (−80% tokens)"],
+    ["4 Barcode + DB Enrich","ZXing + Open Food Facts → free fill 20-40% of FMCG ($0 AI)"],
+    ["5 Vision LLM","Gemini 2.5 Flash, 8-frame batches, schema-validated JSON + confidence"],
+    ["6 Dedup","CLIP pgvector cosine >0.92 + pHash + name match → one draft per SKU"],
+    ["7 Low-Confidence Refine","Re-run <0.6 frames on Claude Sonnet 4.6 (Opus for hardest)"],
+    ["8 Price & Inventory Est.","Two-stage price-tag detect; facing counts → approx stock"],
+    ["9 Confidence & Triage","Weighted score → green/yellow/orange/red review bands"],
+    ["10 Drafts & Enrichment","Product + Content + SEO + Compliance agents attach suggestions"],
+    ["11 Human Review","Owner approves/edits/merges; resolves compliance — mandatory gate"],
+    ["12 Publish","Explicit owner action only → promote to catalog, index, sitemap, Merchant sync"]
+  ],
+  agents: [
+    ["Extraction ★","Video frames → draft products w/ per-field confidence","Gemini 2.5 Flash → Claude/Opus"],
+    ["Product","Normalize, taxonomy, variant grouping, merge/split","Claude Sonnet 4.6"],
+    ["Design","Theme/layout generation (P3)","Claude Sonnet 4.6 + image model"],
+    ["SEO","Titles, meta, JSON-LD, alt text, Merchant compliance","Claude Sonnet 4.6"],
+    ["Content","Descriptions, page copy in brand voice/locale","Claude Sonnet 4.6"],
+    ["Marketing","Campaigns + ad creative (never auto-launch)","Claude Sonnet 4.6"],
+    ["Inventory","Demand forecast, reorder, dead stock","Gemini 2.5 Flash"],
+    ["Pricing","Margin/competitive suggestions (never auto-apply)","Claude Sonnet 4.6"],
+    ["Customer Service","Order/shipping/returns answers; escalate money","Claude Sonnet 4.6"],
+    ["Analytics","Metrics → plain-language insights (read-only)","Claude Sonnet 4.6"],
+    ["Google","Merchant/GA4/GSC/GBP/GTM orchestration (P4)","Gemini 2.5 Flash"],
+    ["Compliance","Policy/PII/trademark gate — can hard-block publish","Claude Opus 4.8"]
+  ],
+  integrations: {
+    AI: [["Anthropic Claude","Default provider; high-accuracy fallback, content/SEO"],["Google Gemini","Cheap high-volume extraction first pass (~10× cheaper)"],["OpenAI","Tertiary fallback + embeddings"],["ZXing + Open Food Facts","Zero-LLM barcode enrich"]],
+    Payments: [["Stripe Billing","SaaS subscriptions + metered AI credits"],["Stripe Connect","Route buyer funds to tenant stores"],["Stripe Tax","Auto VAT/sales tax"],["Stripe Checkout","Storefront pay UI; keeps PCI SAQ A"]],
+    Google: [["Merchant API v1","Product feed (Content API dies 2026-08-18)"],["Business Profile","Local presence/hours/posts"],["GA4","Server-side events + Admin API"],["Search Console","Sitemaps + indexing"],["Maps / GTM / OAuth","Geocoding, tags, per-tenant consent"]],
+    Shipping: [["Shippo","P1 aggregator: 40+ carriers incl. Bring"],["PostNord (direct)","Full Nordic coverage (P2)"],["EasyPost","High-volume migration target"]],
+    Ads: [["Google Ads","Paid search (late P4/P5; annual audit)"],["Meta / TikTok / Pinterest","Social campaign + catalog sync"]],
+    "Storage / Search / Mail": [["Cloudflare R2","Prod storage, $0 egress, EU lock"],["MinIO","Local S3 parity"],["Meilisearch","Per-tenant token search"],["Email (SMTP/SendGrid)","Transactional; Mailhog dev"],["Doppler","Secrets across dev/prod"]]
+  },
+  pricing: [
+    ["Free","$0","<20 SKUs · 1 wow extraction"],
+    ["Starter","$29/mo","1k products · 30 extr min · 1% GMV"],
+    ["Growth","$79/mo","10k products · store builder + 1 agent · 0.5% GMV"],
+    ["Pro","$199/mo","50k products · all agents · 0% GMV"],
+    ["Enterprise","Custom","Unlimited · white-label · SSO · SLA"]
+  ],
+  revStreams: [
+    ["Tiered SaaS subscriptions","Recurring","The recurring base across Free→Enterprise tiers."],
+    ["AI usage credits","Metered","Extraction minutes + generation credits; ≥75% gross margin."],
+    ["GMV transaction fee","Commerce","1%→0% by tier via Stripe Connect application fee."],
+    ["White-label / agency licensing","Channel","Resellers run AICOS under their brand (P5)."],
+    ["Integrations marketplace","Take-rate","First/third-party connector listings (P4-P5)."],
+    ["Theme & domain/hosting / services","Future","Marketplace, reseller margin, done-for-you onboarding."]
+  ],
+  risks: [
+    ["Cross-tenant data leakage via RLS / pool misconfig","Security","Critical","Medium","FORCE RLS; set_config(TRUE) in $transaction; withTenant sole DB path; CI isolation test"],
+    ["RLS bypass via superuser VIEW / SECURITY DEFINER","Security","Critical","Medium","security_invoker=true on all views; CI lint"],
+    ["Postgres RLS CVEs on <16.9","Security","Critical","High","Pin PG ≥16.9; renovate alerts"],
+    ["AI cost bomb (abuse/compromise)","Security","Critical","High","AiCreditGuard + BullMQ limiter + per-tenant caps + capped free tier"],
+    ["AI extraction errors (hallucinated price/SKU)","Technical","High","High","Mandatory human gate; per-field confidence; schema+regex validation"],
+    ["Motion blur / occluded price tags","Technical","High","High","Laplacian blur gate; filming guidance; missing-price surfacing; photo fallback"],
+    ["Wrong products → wrong store","Technical","Critical","Low","Tenant-scoped job IDs; RLS on extraction tables; human gate"],
+    ["Google Content API shutdown 2026-08-18","Vendor","High","High","Build Merchant API v1 only from day one"],
+    ["Google OAuth verification delay blocks P4","Vendor","High","Medium","Submit in P3; create GBP now; add beta test users"],
+    ["AI provider outage / rate limits","Vendor","High","Medium","Gemini→Claude→OpenAI fallback chain; backoff"],
+    ["Stripe Connect chargeback liability on platform","Vendor","High","Medium","Dispute-evidence workflow; per-tenant reserves; balance/credit line"],
+    ["Incumbent copies video-to-catalog","Business","High","Medium","Execute fast; data network effects; full-OS moat"],
+    ["BullMQ worker starvation under load","Scalability","High","Medium","KEDA queue-depth autoscaling; separate worker app"],
+    ["GDPR dual-role obligations unmet","Compliance","High","Medium","DSAR endpoints in P1; retention job; EU region lock; DPA"],
+    ["Owner reluctance to film shelves","Business","Medium","Medium","Photo-batch fallback; privacy messaging; in-app guidance"]
+  ],
+  strengths: [
+    "Module names, keys & phase assignments are consistent with the SPEC across module-map, roadmap, api-registry, database-registry & the Prisma schema (24 modules, P0–P5, 1:1).",
+    "Domain-override applied uniformly — every doc treats AICOS as a general e-commerce OS (not restaurant).",
+    "The Prisma schema is genuinely coherent: 54 models, cuid() ids, integer-cents money everywhere, tenantId + composite indexes, append-only ledgers, explicit human-gate, pgvector/citext/pg_trgm.",
+    "All 7 strategic decisions represented identically & in depth; no contradictory search/storage references survive.",
+    "Ports fully consistent across project-ports.json, roadmap, system-architecture & api-design — zero drift.",
+    "Broad proposal coverage: flagship extraction, store builder + cloning, 11 theme verticals, 8 Google API families, Stripe Billing+Connect+Tax, 12 agents, RLS isolation, shipping, portal, all 9 real-world scenarios.",
+    "Strong safety discipline: human gate at 3 layers, AI cost governance via usage ledger, tenant isolation defense-in-depth; 317 endpoints mapped to modules/roles/phases."
+  ],
+  reconcile: [
+    "Rewrote module-map Section 2 to the real 54-model table names (was ~40 non-existent names) + deferred-phase tags.",
+    "Reconciled flagship feature docs to canonical schema: ExtractionResult/ExtractionReviewItem (not ProductDraft/RawDetection), ExtractionJobStatus enum, integer-cents + aiCostMicros (not Decimal), 60-80 frames.",
+    "Unified the extraction job-status vocabulary across schema, api-design & feature docs.",
+    "Added P1-critical models: ConnectAccount, Dispute(+evidence), Return/ReturnItem; + extraction facing-count/quantity fields.",
+    "Added a 'Schema deferred to phase' ledger so P3–P4 gaps are tracked decisions, not silent omissions.",
+    "Clarified JWT signing-key rotation (90d) vs access-token TTL (15m); fixed loose FK relations."
+  ],
+  intel: "6 research dossiers · 9 Master-Brain docs · flagship feature pack · 54→59-model schema · 317-endpoint registry · 12-agent spec",
+  timeline: [
+    ["2026-06-03","Read source-of-truth (baseline + proposal); resolved restaurant↔e-commerce domain conflict → e-commerce wins"],
+    ["2026-06-03","Git initialized; remote wired to github.com/shani81/e_commerce_echosystem"],
+    ["2026-06-03","Ports auto-discovered & locked; Docker infra + .env template written"],
+    ["2026-06-03","Startup workflow: 6 research + 6 design + 1 critic agents → Master Brain, architecture, 54-model schema, 317-endpoint API, roadmap"],
+    ["2026-06-03","Reconciliation pass applied critic findings; dashboard generated; planning committed"]
+  ]
+};
+
+/* ============================ HELPERS ============================ */
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+const sevColor = s => ({Critical:'#f87171',High:'#fb923c',Medium:'#fbbf24',Low:'#34d399'}[s]||'#8b93a7');
+const statusColor = s => ({'In Progress':'#60a5fa','Planned':'#8b93a7','Completed':'#34d399','Blocked':'#f87171','Working On':'#fbbf24','On Hold':'#a78bfa'}[s]||'#8b93a7');
+const scoreColor = v => v>=70?'#34d399':v>=45?'#60a5fa':v>=25?'#fbbf24':'#f87171';
+const phaseColor = p => ({P0:'#60a5fa',P1:'#34d399',P2:'#a78bfa',P3:'#f472b6',P4:'#fbbf24',P5:'#fb923c'}[p]||'#8b93a7');
+
+/* ============================ RENDER ============================ */
+$('#ts').textContent = D.lastUpdated;
+$('#northStar').textContent = D.northStar;
+$('#phaseChip').outerHTML = `<span class="chip" style="border-color:#4259e0;color:#7c9bff">${D.phase}</span>`;
+$('#healthChip').outerHTML = `<span class="chip" style="border-color:${scoreColor(D.scores.overall)};color:${scoreColor(D.scores.overall)}">Health ${D.scores.overall}</span>`;
+$('#readyChip').outerHTML = `<span class="chip" style="border-color:${scoreColor(D.scores.enterpriseReadiness)};color:${scoreColor(D.scores.enterpriseReadiness)}">Enterprise ${D.scores.enterpriseReadiness}</span>`;
+
+D.stats.forEach(s=>{$('#execStats').append(el('div','rounded-xl bg-ink-850 border border-ink-700 p-3',
+  `<div class="text-2xl font-extrabold text-white">${s.v}</div><div class="text-xs text-slate-300 font-medium">${s.k}</div><div class="text-[11px] text-mute">${s.s}</div>`))});
+
+D.scoreOrder.forEach(([k,label])=>{const v=D.scores[k];
+  $('#scoreBars').append(el('div','',`<div class="flex justify-between text-[12px] mb-1"><span class="${k==='overall'?'text-white font-semibold':'text-slate-300'}">${label}</span><span class="mono" style="color:${scoreColor(v)}">${v}</span></div><div class="h-1.5 rounded-full bg-ink-700 overflow-hidden"><div class="h-full rounded-full" style="width:${v}%;background:${scoreColor(v)}"></div></div>`))});
+$('#scoreBars').append(el('p','text-[11px] text-mute pt-1',D.scoreNote));
+
+D.urls.forEach(([k,u])=>$('#urls').append(el('div','flex justify-between gap-3',`<span class="text-mute">${k}</span><a class="text-brand-400 hover:underline" href="${u}" target="_blank">${u.replace('http://','')}</a>`)));
+D.creds.forEach(([r,u,p])=>$('#creds').append(el('div','flex justify-between gap-3 items-baseline',`<span class="text-mute">${r}</span><span class="text-slate-300">${u!=='—'?u+' / ':''}<span class="text-amber-300">${p}</span></span>`)));
+
+/* ---- Roadmap SVG (visio-like timeline) ---- */
+(function(){
+  const W=920,H=300,padX=24,top=70,laneH=58,gap=18;
+  const n=D.phases.length, segW=(W-padX*2-gap*(n-1))/n;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">`;
+  svg+=`<line x1="${padX}" y1="${top-22}" x2="${W-padX}" y2="${top-22}" stroke="#2d3342" stroke-width="2"/>`;
+  D.phases.forEach((p,i)=>{
+    const x=padX+i*(segW+gap), col=phaseColor(p.key), done=p.status!=='Planned';
+    // axis node
+    svg+=`<circle cx="${x+10}" cy="${top-22}" r="6" fill="${done?col:'#181c25'}" stroke="${col}" stroke-width="2"/>`;
+    svg+=`<text x="${x+10}" y="${top-34}" fill="${col}" font-size="12" font-weight="700">${p.key}</text>`;
+    // phase block
+    svg+=`<rect x="${x}" y="${top}" width="${segW}" height="${laneH}" rx="10" fill="#13161d" stroke="${col}" stroke-opacity="0.5"/>`;
+    svg+=`<rect x="${x}" y="${top}" width="${segW*(p.completion/100)}" height="${laneH}" rx="10" fill="${col}" fill-opacity="0.18"/>`;
+    svg+=`<text x="${x+12}" y="${top+22}" fill="#e6e9f0" font-size="12.5" font-weight="700">${p.name}</text>`;
+    svg+=`<text x="${x+12}" y="${top+40}" fill="#8b93a7" font-size="10.5">${p.status} · ${p.completion}%</text>`;
+    svg+=`<text x="${x+segW-12}" y="${top+40}" fill="${col}" font-size="10" text-anchor="end">${p.eta.replace('→','').split('⚠')[0].trim()}</text>`;
+    // milestones
+    p.milestones.forEach((m,j)=>{
+      const my=top+laneH+gap+j*20.5;
+      svg+=`<circle cx="${x+9}" cy="${my-4}" r="3" fill="${col}"/>`;
+      const label=m.length>30?m.slice(0,29)+'…':m;
+      svg+=`<text x="${x+18}" y="${my}" fill="#aeb6c7" font-size="9.5">${label.replace(/&/g,'&amp;')}</text>`;
+    });
+  });
+  svg+=`</svg>`;
+  $('#roadmapSvg').innerHTML=svg;
+})();
+
+D.phases.forEach(p=>{const col=phaseColor(p.key);
+  $('#phaseCards').append(el('div','card p-4',
+   `<div class="flex items-center justify-between mb-1.5"><span class="chip" style="border-color:${col};color:${col}">${p.key} · ${p.name}</span><span class="text-xs" style="color:${statusColor(p.status)}">${p.status}</span></div>
+    <p class="text-[12.5px] text-slate-300/90 mb-2 leading-snug">${p.goal}</p>
+    <div class="h-1.5 rounded-full bg-ink-700 overflow-hidden mb-1"><div class="h-full" style="width:${Math.max(p.completion,2)}%;background:${col}"></div></div>
+    <div class="text-[11px] text-mute mb-2">${p.completion}% · ${p.eta}</div>
+    <ul class="text-[11.5px] text-slate-400 space-y-0.5">${p.milestones.map(m=>`<li class="flex gap-1.5"><span style="color:${col}">▸</span>${m}</li>`).join('')}</ul>`))});
+
+/* ---- Ecosystem tree ---- */
+$('#ecoTree').textContent =
+`AICOS — AI Commerce OS  (multi-tenant SaaS · shared DB + RLS)
+│
+├─ Platform Core ............ iam · billing · admin · notifications · media · search
+│
+├─ Commerce Engine ......... catalog · inventory · orders · payments · shipping · customers · storefront
+│
+├─ AI Layer ★ .............. ai-core ─┬─ ai-extraction (video→catalog, FLAGSHIP)
+│                                     ├─ content (descriptions/SEO)
+│                                     └─ 12 agents (product/design/seo/marketing/…)
+│
+├─ Site Generation ......... store-builder ─ website-cloning ─ theme-engine
+│
+├─ Growth & Intelligence ... google ─ marketing ─ customer-service ─ pricing ─ analytics
+│
+└─ Scale ................... automation · multi-region · k8s · white-label
+        │
+        External ........... Stripe · Google (Merchant/GBP/GA4/GSC) · Shippo/PostNord · R2/S3 · Ads`;
+
+/* ---- Modules ---- */
+$('#modCount').textContent = `(${D.modules.length})`;
+const phases=[...new Set(D.modules.map(m=>m.phase))].sort();
+let activePhase='all';
+const phaseBtns={};
+function renderModules(){
+  const g=$('#moduleGrid'); g.innerHTML='';
+  D.modules.filter(m=>activePhase==='all'||m.phase===activePhase).forEach(m=>{
+    const col=phaseColor(m.phase), flag=m.name.includes('★');
+    g.append(el('div',`card p-3.5 ${flag?'glow':''}`,
+     `<div class="flex items-center justify-between mb-1"><span class="chip" style="border-color:${col};color:${col}">${m.phase}</span><span class="text-[10px] text-mute">Planned · 0%</span></div>
+      <div class="text-[13.5px] font-semibold text-white leading-snug mb-1">${m.name}</div>
+      <div class="text-[10.5px] text-mute mono">${m.key}</div>
+      ${m.deps.length?`<div class="text-[10.5px] text-slate-500 mt-1.5">↳ ${m.deps.join(' · ')}</div>`:`<div class="text-[10.5px] text-slate-600 mt-1.5">↳ no deps (foundation)</div>`}`));
+  });
+}
+$('#phaseFilter').append(el('button','chip',`all`));
+$('#phaseFilter').firstChild.onclick=()=>{activePhase='all';setActive('all')};
+phases.forEach(p=>{const b=el('button','chip',`${p}`);b.style.borderColor=phaseColor(p);b.style.color=phaseColor(p);b.onclick=()=>{activePhase=p;setActive(p)};phaseBtns[p]=b;$('#phaseFilter').append(b)});
+function setActive(p){[...$('#phaseFilter').children].forEach(b=>b.style.background='');const target=[...$('#phaseFilter').children].find(b=>b.textContent===p);if(target)target.style.background='#222734';renderModules()}
+renderModules();
+
+/* ---- DB & API ---- */
+$('#dbStat').innerHTML=`<span class="text-3xl font-extrabold text-white">${D.dbCount}</span> <span class="text-mute text-sm">models</span>`;
+D.dbModules.forEach(([m,c])=>$('#dbModules').append(el('div','flex justify-between gap-2 border-b border-ink-800 pb-1',`<span class="text-slate-300">${m}</span><span class="text-mute mono text-xs">${c}</span>`)));
+$('#apiStat').innerHTML=`<span class="text-3xl font-extrabold text-white">${D.apiCount}</span> <span class="text-mute text-sm">endpoints · ${D.apiGroups.length} groups</span>`;
+D.apiGroups.forEach(g=>$('#apiGroups').append(el('div','text-slate-400',`<span class="text-brand-400">/</span>${g}`)));
+
+/* ---- AI ---- */
+D.pipeline.forEach(([s,d])=>$('#pipeline').append(el('li','flex gap-2',`<span class="text-brand-400 font-semibold mono text-[11px] whitespace-nowrap">${s.split(' ')[0]}</span><span><span class="text-slate-200 font-medium">${s.replace(/^\d+ /,'')}</span> <span class="text-mute">— ${d}</span></span>`)));
+$('#agentCount').textContent=`(${D.agents.length})`;
+D.agents.forEach(([n,p,prov])=>$('#agents').append(el('div','border-b border-ink-800 pb-1.5',`<div class="flex justify-between gap-2"><span class="text-slate-200 font-medium">${n}</span><span class="text-[10.5px] text-mute text-right">${prov}</span></div><div class="text-[11.5px] text-slate-400">${p}</div>`)));
+
+/* ---- Integrations ---- */
+const intAll=Object.values(D.integrations).reduce((a,v)=>a+v.length,0);
+$('#intCount').textContent=`(${intAll})`;
+Object.entries(D.integrations).forEach(([cat,items])=>{
+  const c=el('div','card p-4',`<div class="text-xs uppercase tracking-wide text-mute mb-2">${cat}</div>`);
+  items.forEach(([n,d])=>c.append(el('div','mb-1.5',`<div class="text-[13px] text-slate-200 font-medium">${n}</div><div class="text-[11.5px] text-slate-400 leading-snug">${d}</div>`)));
+  $('#intGroups').append(c);
+});
+
+/* ---- Revenue ---- */
+D.pricing.forEach(([n,pr,f])=>$('#pricing').append(el('div','card p-4 text-center',`<div class="text-sm font-semibold text-white">${n}</div><div class="text-xl font-extrabold text-brand-400 my-1">${pr}</div><div class="text-[11px] text-mute leading-snug">${f}</div>`)));
+D.revStreams.forEach(([n,t,d])=>$('#revStreams').append(el('div','card p-4',`<div class="flex justify-between items-baseline mb-1"><span class="text-[13.5px] font-semibold text-white">${n}</span><span class="chip" style="border-color:#2d3342;color:#8b93a7">${t}</span></div><div class="text-[12px] text-slate-400">${d}</div>`)));
+
+/* ---- Risks ---- */
+$('#riskCount').textContent=`(${D.risks.length} shown)`;
+D.risks.forEach(([t,c,sev,prob,mit])=>$('#riskRows').append(el('tr','border-b border-ink-800 align-top',
+  `<td class="py-2.5 px-4 text-slate-200">${t}</td><td class="px-3 text-mute">${c}</td><td class="px-3"><span class="chip" style="border-color:${sevColor(sev)};color:${sevColor(sev)}">${sev}</span></td><td class="px-3 text-slate-400">${prob}</td><td class="px-4 text-slate-400 text-[12px] hidden lg:table-cell">${mit}</td>`)));
+
+/* ---- Quality ---- */
+D.strengths.forEach(s=>$('#strengths').append(el('li','flex gap-2',`<span class="text-ok">✓</span><span class="text-slate-300">${s}</span>`)));
+D.reconcile.forEach(s=>$('#reconcile').append(el('li','flex gap-2',`<span class="text-brand-400">⤳</span><span class="text-slate-300">${s}</span>`)));
+$('#intel').textContent=D.intel;
+
+/* ---- Timeline ---- */
+D.timeline.forEach(([d,t])=>$('#timeline').append(el('li','ml-4',`<div class="absolute -left-[7px] w-3 h-3 rounded-full bg-brand-500 border-2 border-ink-950"></div><div class="text-[11px] text-mute mono">${d}</div><div class="text-[13px] text-slate-300">${t}</div>`)));
+</script>
+</body>
+</html>

@@ -1,0 +1,2062 @@
+// =============================================================================
+// AICOS — AI Commerce OS — Prisma Schema (DRAFT, Phase 0 planning)
+// =============================================================================
+// Status: DRAFT for review. No migrations have been generated yet.
+//
+// Multi-tenancy: shared database, shared schema, `tenantId` on every tenant-
+// scoped row, enforced at the DB layer by PostgreSQL Row-Level Security (RLS).
+// Prisma does NOT manage RLS policies — those are added via raw-SQL migration
+// steps (see prisma/migrations/_rls/ and .ai/database/schema-design.md).
+//
+// Conventions:
+//   - cuid() string primary keys named `id`.
+//   - Every tenant-scoped model has `tenantId String` + relation to Tenant,
+//     plus @@index([tenantId]) and @@index([tenantId, createdAt]).
+//   - Money stored as integer minor units (cents) — never Float.
+//   - Soft-delete via `deletedAt DateTime?` on user-facing catalog/commerce rows.
+//   - All timestamps UTC; createdAt/updatedAt on every model.
+//   - PostgreSQL 16.9+ required (RLS CVE fixes). pgvector + citext extensions.
+//
+// Target Prisma version: 6.x (datasource `url = env(...)` block, classic
+// generator). Validated clean with prisma@6 `validate`. Under Prisma 7 the
+// datasource URL moves to prisma.config.ts — adjust at implementation time if
+// the monorepo pins 7.x; the model definitions below are unchanged either way.
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "fullTextSearchPostgres", "views"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, pg_trgm, vector, citext]
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum TenantPlanTier {
+  FREE
+  STARTER
+  GROWTH
+  PRO
+  ENTERPRISE
+}
+
+enum DataRegion {
+  EU
+  US
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+// Platform-level roles map 1:1 to AICOS personas; STORE_* are tenant-scoped.
+enum RoleType {
+  PLATFORM_SUPER_ADMIN
+  AGENCY_RESELLER
+  STORE_OWNER
+  STORE_MANAGER
+  STORE_STAFF
+  CUSTOM
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum StoreStatus {
+  DRAFT
+  BUILDING
+  PUBLISHED
+  SUSPENDED
+}
+
+enum ProductStatus {
+  DRAFT          // created/extracted, not yet reviewed
+  PENDING_REVIEW // awaiting human verification gate
+  ACTIVE         // published & sellable
+  ARCHIVED
+}
+
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+  SERVICE
+  GIFT_CARD
+}
+
+enum WeightUnit {
+  G
+  KG
+  OZ
+  LB
+}
+
+enum InventoryPolicy {
+  DENY      // stop selling at 0
+  CONTINUE  // allow backorder/oversell
+}
+
+enum StockMovementType {
+  RECEIVE
+  SALE
+  RETURN
+  ADJUSTMENT
+  RESERVATION
+  RELEASE
+  TRANSFER
+  EXTRACTION_SEED
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING
+  PAID
+  PARTIALLY_FULFILLED
+  FULFILLED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum FinancialStatus {
+  UNPAID
+  AUTHORIZED
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  VOIDED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIAL
+  FULFILLED
+  RETURNED
+}
+
+enum PaymentProvider {
+  STRIPE
+  MANUAL
+  GIFT_CARD
+}
+
+enum PaymentStatus {
+  REQUIRES_ACTION
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+  STORE_PICKUP
+}
+
+enum ShipmentStatus {
+  PENDING
+  LABEL_PURCHASED
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  UNPAID
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+enum CreditType {
+  EXTRACTION_MINUTES
+  GENERATION_CREDITS
+}
+
+enum CreditTxnReason {
+  GRANT
+  SUBSCRIPTION_REFILL
+  PURCHASE
+  CONSUMPTION
+  EXPIRY
+  ADJUSTMENT
+  REFUND
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  FRAME
+  DOCUMENT
+  AUDIO
+}
+
+enum MediaStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+  QUARANTINED
+}
+
+enum ExtractionJobStatus {
+  QUEUED
+  INGESTING       // FFmpeg keyframe extraction
+  PREFILTERING    // YOLO + ZXing barcode
+  ANALYZING       // LLM vision pass (Gemini primary, Claude fallback)
+  DEDUPLICATING   // pgvector/CLIP cross-frame merge
+  MERGING         // build draft product records
+  AWAITING_REVIEW // human verification gate
+  PUBLISHED       // owner clicked Publish
+  FAILED
+  CANCELLED
+}
+
+enum ExtractionSource {
+  VIDEO
+  PHOTO_BATCH     // privacy/fallback path
+  BARCODE_SCAN
+  CSV_IMPORT
+  WOOCOMMERCE_IMPORT
+}
+
+enum ReviewDecision {
+  PENDING
+  ACCEPTED
+  EDITED
+  REJECTED
+  MERGED
+  SPLIT
+}
+
+enum AiProvider {
+  ANTHROPIC
+  OPENAI
+  GEMINI
+}
+
+enum AiAgentType {
+  EXTRACTION
+  PRODUCT
+  DESIGN
+  SEO
+  CONTENT
+  MARKETING
+  INVENTORY
+  PRICING
+  CUSTOMER_SERVICE
+  ANALYTICS
+  GOOGLE
+  COMPLIANCE
+}
+
+enum AiRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+  SMS
+  WEBHOOK
+  CHAT
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+}
+
+enum IntegrationProvider {
+  GOOGLE_BUSINESS_PROFILE
+  GOOGLE_MERCHANT_CENTER
+  GOOGLE_ANALYTICS
+  GOOGLE_SEARCH_CONSOLE
+  GOOGLE_TAG_MANAGER
+  GOOGLE_ADS
+  GOOGLE_MAPS
+  META_ADS
+  TIKTOK_ADS
+  PINTEREST_ADS
+  SHIPPO
+  EASYPOST
+  POSTNORD
+  SENDGRID
+}
+
+enum AdCampaignChannel {
+  GOOGLE_ADS
+  META_ADS
+  TIKTOK_ADS
+  PINTEREST_ADS
+  EMAIL
+}
+
+enum AdCampaignStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum AutomationTrigger {
+  ORDER_CREATED
+  ORDER_PAID
+  ORDER_FULFILLED
+  LOW_STOCK
+  ABANDONED_CART
+  NEW_CUSTOMER
+  PRODUCT_PUBLISHED
+  EXTRACTION_COMPLETED
+  SCHEDULE_CRON
+  WEBHOOK
+}
+
+enum AutomationRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PUBLISH
+  EXPORT
+  ERASE
+  PERMISSION_CHANGE
+  BILLING_EVENT
+  AI_RUN
+}
+
+enum DsarType {
+  EXPORT
+  ERASURE
+}
+
+enum DsarStatus {
+  RECEIVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum DisputeStatus {
+  NEEDS_RESPONSE
+  UNDER_REVIEW
+  WON
+  LOST
+  WARNING_NEEDS_RESPONSE
+  WARNING_UNDER_REVIEW
+  WARNING_CLOSED
+  CHARGE_REFUNDED
+}
+
+enum DisputeEvidenceType {
+  RECEIPT
+  SHIPPING_DOCUMENTATION
+  CUSTOMER_COMMUNICATION
+  REFUND_POLICY
+  SERVICE_DOCUMENTATION
+  UNCATEGORIZED_TEXT
+  OTHER
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  RECEIVED
+  REFUNDED
+  REJECTED
+}
+
+// =============================================================================
+// MODULE: iam — Identity, Auth, RBAC & Multi-Tenancy  (Phase P0)
+// =============================================================================
+
+/// Root tenant record. One per store-owner account. NOT itself tenant-scoped
+/// (this IS the tenant). All RLS policies key off Tenant.id == app.current_tenant.
+model Tenant {
+  id            String         @id @default(cuid())
+  slug          String         @unique // subdomain / URL key
+  name          String
+  status        TenantStatus   @default(TRIAL)
+  planTier      TenantPlanTier @default(FREE)
+  dataRegion    DataRegion     @default(EU) // GDPR residency routing
+  defaultLocale String         @default("en")
+  defaultCurrency String       @default("USD")
+  agencyId      String? // set when provisioned by an Agency/White-label reseller
+  trialEndsAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+
+  agency             Tenant?              @relation("AgencyTenants", fields: [agencyId], references: [id])
+  managedTenants     Tenant[]             @relation("AgencyTenants")
+  memberships        Membership[]
+  roles              Role[]
+  stores             Store[]
+  products           Product[]
+  variants           ProductVariant[]
+  categories         Category[]
+  brands             Brand[]
+  inventoryItems     InventoryItem[]
+  inventoryLocations InventoryLocation[]
+  stockMovements     StockMovement[]
+  orders             Order[]
+  orderItems         OrderItem[]
+  customers          Customer[]
+  addresses          Address[]
+  payments           Payment[]
+  refunds            Refund[]
+  connectAccount     ConnectAccount?
+  disputes           Dispute[]
+  disputeEvidence    DisputeEvidence[]
+  returns            Return[]
+  returnItems        ReturnItem[]
+  shipments          Shipment[]
+  mediaAssets        MediaAsset[]
+  extractionJobs     ExtractionJob[]
+  extractionResults  ExtractionResult[]
+  reviewItems        ExtractionReviewItem[]
+  themeConfigs       ThemeConfig[]
+  aiAgentRuns        AiAgentRun[]
+  aiUsageEvents      AiUsageEvent[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  subscription       Subscription?
+  creditBalances     CreditBalance[]
+  creditTxns         CreditTransaction[]
+  invoices           Invoice[]
+  oauthConnections   OAuthConnection[]
+  integrations       IntegrationConnection[]
+  carts              Cart[]
+  discounts          Discount[]
+  giftCards          GiftCard[]
+  reviews            ProductReview[]
+  webhookEndpoints   WebhookEndpoint[]
+  adCampaigns        AdCampaign[]
+  analyticsSnaps     AnalyticsSnapshot[]
+  automations        Automation[]
+  automationRuns     AutomationRun[]
+  searchSyncJobs     SearchSyncJob[]
+  dsarRequests       DsarRequest[]
+  apiKeys            ApiKey[]
+
+  @@index([status])
+  @@index([planTier])
+  @@index([agencyId])
+  @@map("tenants")
+}
+
+/// A platform-level identity. A user may belong to multiple tenants via
+/// Membership. Authentication credentials live here; authorization lives in
+/// Membership/Role. End-customers (shoppers) are NOT Users — see Customer.
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique // citext in DB (case-insensitive)
+  emailVerified Boolean    @default(false)
+  passwordHash  String? // bcrypt cost 12; null when OAuth-only
+  fullName      String?
+  avatarUrl     String?
+  phone         String?
+  status        UserStatus @default(INVITED)
+  lastLoginAt   DateTime?
+  mfaEnabled    Boolean    @default(false)
+  mfaSecret     String? // encrypted
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  memberships Membership[]
+  sessions    Session[]
+  auditLogs   AuditLog[]
+
+  @@index([status])
+  @@map("users")
+}
+
+/// Refresh-token-backed session. Access tokens are short-lived JWTs (RS256)
+/// held in memory client-side; refresh tokens are rotated and tracked here.
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ip               String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Role definition. Tenant-scoped custom roles + global platform roles
+/// (tenantId null for built-in platform roles). Permissions are a JSON array
+/// of "resource:action" grants resolved by the RBAC guard.
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String? // null = platform-global built-in role
+  type        RoleType
+  name        String
+  description String?
+  permissions Json     @default("[]") // e.g. ["product:write","order:read"]
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships Membership[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([type])
+  @@map("roles")
+}
+
+/// Join of User ↔ Tenant with a Role. This is the authorization edge; a user
+/// can be Owner of one tenant and Staff of another. RLS scoping derives the
+/// active tenant from the request, validated against the user's memberships.
+model Membership {
+  id        String           @id @default(cuid())
+  tenantId  String
+  userId    String
+  roleId    String
+  status    MembershipStatus @default(PENDING)
+  invitedBy String?
+  invitedAt DateTime         @default(now())
+  acceptedAt DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([userId])
+  @@map("memberships")
+}
+
+/// Tenant-scoped API key for programmatic access (agency/integration use).
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  name       String
+  prefix     String    @unique // first 8 chars, shown in UI
+  keyHash    String    @unique // sha256 of full key
+  scopes     Json      @default("[]")
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("api_keys")
+}
+
+// =============================================================================
+// MODULE: billing — SaaS Subscription Billing (platform)  (Phase P0)
+// =============================================================================
+
+/// Platform pricing plan (Starter/Growth/Pro/Enterprise + Free). NOT tenant-
+/// scoped — these are the global product catalog of AICOS itself.
+model Plan {
+  id                   String         @id @default(cuid())
+  tier                 TenantPlanTier @unique
+  name                 String
+  stripePriceIdMonthly String?
+  stripePriceIdYearly  String?
+  priceMonthlyCents    Int            @default(0)
+  priceYearlyCents     Int            @default(0)
+  currency             String         @default("USD")
+  // Entitlement limits
+  maxProducts          Int            @default(20)
+  maxStores            Int            @default(1)
+  maxStaffSeats        Int            @default(1)
+  includedExtractionMinutes Int       @default(5)
+  includedGenerationCredits Int       @default(50)
+  transactionFeeBps    Int            @default(0) // optional % on GMV, basis points
+  features             Json           @default("{}")
+  isActive             Boolean        @default(true)
+  sortOrder            Int            @default(0)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// A tenant's active subscription to a Plan, mirrored from Stripe Billing.
+model Subscription {
+  id                   String             @id @default(cuid())
+  tenantId             String             @unique
+  planId               String
+  status               SubscriptionStatus @default(TRIALING)
+  interval             BillingInterval    @default(MONTH)
+  stripeCustomerId     String? // platform Stripe customer (SaaS billing flow)
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  trialEndsAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
+  invoices Invoice[]
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// Platform invoice (SaaS subscription + metered AI usage), mirrored from Stripe.
+model Invoice {
+  id               String   @id @default(cuid())
+  tenantId         String
+  subscriptionId   String?
+  stripeInvoiceId  String?  @unique
+  number           String?
+  amountDueCents   Int
+  amountPaidCents  Int      @default(0)
+  currency         String   @default("USD")
+  status           String   @default("draft") // draft|open|paid|void|uncollectible
+  hostedInvoiceUrl String?
+  pdfUrl           String?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("invoices")
+}
+
+/// Per-tenant balance of a consumable credit type (extraction minutes / gen credits).
+model CreditBalance {
+  id        String     @id @default(cuid())
+  tenantId  String
+  type      CreditType
+  balance   Int        @default(0) // current available units
+  updatedAt DateTime   @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type])
+  @@index([tenantId])
+  @@map("credit_balances")
+}
+
+/// Append-only ledger of credit grants and consumption. Source of truth for
+/// AI cost governance — every AiUsageEvent that consumes credits writes here.
+model CreditTransaction {
+  id          String          @id @default(cuid())
+  tenantId    String
+  type        CreditType
+  reason      CreditTxnReason
+  delta       Int // +grant / -consumption
+  balanceAfter Int
+  refType     String? // "extraction_job" | "ai_agent_run" | "invoice"
+  refId       String?
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([type])
+  @@map("credit_transactions")
+}
+
+// =============================================================================
+// MODULE: storefront / admin — Store container  (Phase P1)
+// =============================================================================
+
+/// A storefront owned by a tenant. Most tenants have exactly one, but the model
+/// supports multi-store (e.g. a fashion chain). Owns catalog publishing context.
+model Store {
+  id            String      @id @default(cuid())
+  tenantId      String
+  name          String
+  slug          String
+  status        StoreStatus @default(DRAFT)
+  customDomain  String?     @unique
+  primaryLocale String      @default("en")
+  currency      String      @default("USD")
+  timezone      String      @default("UTC")
+  // Physical store linkage (Google Business Profile / Maps)
+  addressId     String?
+  geoLat        Float?
+  geoLng        Float?
+  activeThemeId String?
+  publishedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  address      Address?      @relation(fields: [addressId], references: [id])
+  activeTheme  ThemeConfig?  @relation("StoreActiveTheme", fields: [activeThemeId], references: [id])
+  themeConfigs ThemeConfig[] @relation("StoreThemeConfigs")
+  products     Product[]
+  orders       Order[]
+  carts        Cart[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([status])
+  @@map("stores")
+}
+
+// =============================================================================
+// MODULE: catalog — Product Catalog & Variants  (Phase P1)
+// =============================================================================
+
+model Category {
+  id          String   @id @default(cuid())
+  tenantId    String
+  parentId    String?
+  name        String
+  slug        String
+  description String?
+  imageUrl    String?
+  position    Int      @default(0)
+  aiGenerated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products ProductCategory[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@map("categories")
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  slug      String
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("brands")
+}
+
+/// Core product. May originate from AI extraction (extractionResultId set) and
+/// always passes the human verification gate before status -> ACTIVE.
+model Product {
+  id              String        @id @default(cuid())
+  tenantId        String
+  storeId         String?
+  brandId         String?
+  title           String
+  slug            String
+  description     String? // long-form, may be AI-generated then sanitized
+  type            ProductType   @default(PHYSICAL)
+  status          ProductStatus @default(DRAFT)
+  // SEO (AI Content module)
+  seoTitle        String?
+  seoDescription  String?
+  // Provenance
+  extractionResultId String?    @unique
+  aiGenerated     Boolean       @default(false)
+  // Search/dedup
+  primaryImageId  String?
+  searchKeywords  String?
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store             Store?            @relation(fields: [storeId], references: [id])
+  brand             Brand?            @relation(fields: [brandId], references: [id])
+  extractionResult  ExtractionResult? @relation(fields: [extractionResultId], references: [id])
+  primaryImage      ProductImage?     @relation("ProductPrimaryImage", fields: [primaryImageId], references: [id])
+  variants          ProductVariant[]
+  categories        ProductCategory[]
+  images            ProductImage[]    @relation("ProductImages")
+  reviews           ProductReview[]
+  embedding         ProductEmbedding?
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([brandId])
+  @@map("products")
+}
+
+/// Many-to-many Product ↔ Category (a product can sit in multiple categories).
+model ProductCategory {
+  productId  String
+  categoryId String
+  tenantId   String
+  createdAt  DateTime @default(now())
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([tenantId])
+  @@index([categoryId])
+  @@map("product_categories")
+}
+
+/// A sellable variant (size/color/etc.). Single-variant products still get one
+/// default variant — inventory & pricing always live at the variant level.
+model ProductVariant {
+  id                String          @id @default(cuid())
+  tenantId          String
+  productId         String
+  sku               String?
+  barcode           String? // EAN/UPC; populated by ZXing during extraction
+  title             String // e.g. "500ml / Red"
+  options           Json            @default("{}") // {"size":"500ml","color":"Red"}
+  priceCents        Int             @default(0)
+  compareAtCents    Int?
+  costCents         Int? // for margin/AI pricing agent
+  currency          String          @default("USD")
+  weight            Float?
+  weightUnit        WeightUnit      @default(G)
+  inventoryPolicy   InventoryPolicy @default(DENY)
+  taxable           Boolean         @default(true)
+  position          Int             @default(0)
+  // Extraction confidence carried to review UI (0..1 per field in JSON)
+  fieldConfidence   Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([productId])
+  @@index([barcode])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id         String   @id @default(cuid())
+  tenantId   String
+  productId  String
+  mediaId    String
+  position   Int      @default(0)
+  altText    String? // AI-generated alt text (accessibility + SEO)
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  product       Product    @relation("ProductImages", fields: [productId], references: [id], onDelete: Cascade)
+  media         MediaAsset @relation(fields: [mediaId], references: [id])
+  primaryForProducts Product[] @relation("ProductPrimaryImage")
+
+  @@index([tenantId])
+  @@index([productId])
+  @@map("product_images")
+}
+
+/// CLIP/embedding vector for cross-frame dedup and semantic search.
+/// The `embedding` column is pgvector type (added via raw-SQL migration).
+model ProductEmbedding {
+  id        String   @id @default(cuid())
+  tenantId  String
+  productId String   @unique
+  model     String   @default("clip-vit-b-32")
+  // embedding vector(512) — declared in raw SQL migration, not Prisma-typed
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("product_embeddings")
+}
+
+/// Customer-submitted product review (storefront).
+model ProductReview {
+  id         String   @id @default(cuid())
+  tenantId   String
+  productId  String
+  customerId String?
+  rating     Int // 1..5
+  title      String?
+  body       String?
+  isApproved Boolean  @default(false) // human/AI-moderation gate
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([productId])
+  @@map("product_reviews")
+}
+
+// =============================================================================
+// MODULE: inventory — Inventory Management  (Phase P1)
+// =============================================================================
+
+/// A stocking location (physical store, warehouse, pickup point).
+model InventoryLocation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  isDefault Boolean  @default(false)
+  addressId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  address        Address?        @relation(fields: [addressId], references: [id])
+  inventoryItems InventoryItem[]
+  stockMovements StockMovement[]
+
+  @@index([tenantId])
+  @@map("inventory_locations")
+}
+
+/// Stock level for a variant at a location. on-hand minus reserved = available.
+model InventoryItem {
+  id           String   @id @default(cuid())
+  tenantId     String
+  variantId    String
+  locationId   String
+  onHand       Int      @default(0)
+  reserved     Int      @default(0)
+  reorderPoint Int      @default(0) // drives LOW_STOCK automation + AI forecasting
+  reorderQty   Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  variant   ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location  InventoryLocation @relation(fields: [locationId], references: [id])
+  movements StockMovement[]
+
+  @@unique([variantId, locationId])
+  @@index([tenantId])
+  @@index([tenantId, updatedAt])
+  @@map("inventory_items")
+}
+
+/// Append-only stock ledger. Every change to InventoryItem writes a movement.
+model StockMovement {
+  id              String            @id @default(cuid())
+  tenantId        String
+  inventoryItemId String
+  locationId      String
+  type            StockMovementType
+  quantity        Int // signed delta
+  reason          String?
+  refType         String? // "order" | "extraction_job" | "manual"
+  refId           String?
+  createdAt       DateTime          @default(now())
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem     @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  location      InventoryLocation @relation(fields: [locationId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([inventoryItemId])
+  @@map("stock_movements")
+}
+
+// =============================================================================
+// MODULE: customers — Customer Management & Portal  (Phase P1)
+// =============================================================================
+
+/// End customer (shopper) of a tenant's store. Distinct from platform User.
+/// GDPR: tenant is controller, AICOS is processor for this data.
+model Customer {
+  id            String   @id @default(cuid())
+  tenantId      String
+  email         String // citext in DB
+  firstName     String?
+  lastName      String?
+  phone         String?
+  acceptsMktg   Boolean  @default(false)
+  stripeCustomerId String? // connected-account customer for commerce charges
+  note          String?
+  totalSpentCents Int    @default(0)
+  ordersCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime? // soft-delete; hard-erase via DSAR worker
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  addresses Address[]
+  orders    Order[]
+  carts     Cart[]
+  reviews   ProductReview[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("customers")
+}
+
+/// Postal address — shared by Customer, Order (snapshot), Store, Location.
+model Address {
+  id          String      @id @default(cuid())
+  tenantId    String
+  customerId  String?
+  type        AddressType @default(SHIPPING)
+  firstName   String?
+  lastName    String?
+  company     String?
+  line1       String
+  line2       String?
+  city        String
+  region      String? // state/province
+  postalCode  String?
+  country     String // ISO-3166-1 alpha-2
+  phone       String?
+  isDefault   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  stores             Store[]
+  inventoryLocations InventoryLocation[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("addresses")
+}
+
+// =============================================================================
+// MODULE: orders — Order Management  (Phase P1)  +  Cart (storefront)
+// =============================================================================
+
+/// Pre-checkout basket. Supports split payment across stores (Phase 2) by
+/// keeping items addressable; the storeId here is the primary store.
+model Cart {
+  id         String    @id @default(cuid())
+  tenantId   String
+  storeId    String?
+  customerId String?
+  token      String    @unique // anonymous cart token
+  currency   String    @default("USD")
+  abandonedAt DateTime? // set by worker for ABANDONED_CART automation
+  convertedOrderId String? @unique
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store    Store?     @relation(fields: [storeId], references: [id])
+  customer Customer?  @relation(fields: [customerId], references: [id])
+  items    CartItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  cartId    String
+  variantId String
+  quantity  Int      @default(1)
+  unitPriceCents Int
+  createdAt DateTime @default(now())
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([cartId, variantId])
+  @@index([tenantId])
+  @@map("cart_items")
+}
+
+/// Customer order. Money in integer minor units. Stripe Connect destination
+/// charge routes funds to the tenant connected account; platform takes
+/// application_fee_amount.
+model Order {
+  id                String            @id @default(cuid())
+  tenantId          String
+  storeId           String
+  customerId        String?
+  number            String // human-friendly per-tenant sequence, e.g. #1001
+  status            OrderStatus       @default(PENDING)
+  financialStatus   FinancialStatus   @default(UNPAID)
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+  currency          String            @default("USD")
+  // Money breakdown (cents)
+  subtotalCents     Int               @default(0)
+  discountCents     Int               @default(0)
+  taxCents          Int               @default(0)
+  shippingCents     Int               @default(0)
+  totalCents        Int               @default(0)
+  // Platform economics
+  applicationFeeCents Int             @default(0) // AICOS transaction fee
+  // Address snapshots (immutable copies, not FKs)
+  shippingAddress   Json?
+  billingAddress    Json?
+  email             String?
+  discountId        String?
+  stripeCheckoutSessionId String?     @unique
+  stripePaymentIntentId   String?     @unique
+  placedAt          DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store     Store       @relation(fields: [storeId], references: [id])
+  customer  Customer?   @relation(fields: [customerId], references: [id])
+  discount  Discount?   @relation(fields: [discountId], references: [id])
+  items     OrderItem[]
+  payments  Payment[]
+  refunds   Refund[]
+  returns   Return[]
+  shipments Shipment[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([customerId])
+  @@map("orders")
+}
+
+/// Line item. Captures price/title at purchase time (snapshot) even if the
+/// product later changes or is deleted.
+model OrderItem {
+  id            String   @id @default(cuid())
+  tenantId      String
+  orderId       String
+  variantId     String?
+  // snapshot fields
+  productTitle  String
+  variantTitle  String?
+  sku           String?
+  quantity      Int      @default(1)
+  unitPriceCents Int
+  totalCents    Int
+  taxCents      Int      @default(0)
+  fulfilledQty  Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
+  returnItems ReturnItem[]
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("order_items")
+}
+
+/// RMA / return request against an order. Drives the return lifecycle and, on
+/// REFUNDED, links to the Refund + a RETURN StockMovement back into inventory.
+model Return {
+  id        String       @id @default(cuid())
+  tenantId  String
+  orderId   String
+  status    ReturnStatus @default(REQUESTED)
+  reason    String?
+  note      String?
+  receivedAt DateTime?
+  refundedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items  ReturnItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([orderId])
+  @@index([status])
+  @@map("returns")
+}
+
+/// A line on a Return referencing the original OrderItem and the returned qty.
+model ReturnItem {
+  id          String   @id @default(cuid())
+  tenantId    String
+  returnId    String
+  orderItemId String
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  return    Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([returnId])
+  @@index([orderItemId])
+  @@map("return_items")
+}
+
+// =============================================================================
+// MODULE: payments — Payments (Stripe)  (Phase P1)
+// =============================================================================
+
+/// A payment attempt against an order (or gift-card redemption).
+model Payment {
+  id                    String          @id @default(cuid())
+  tenantId              String
+  orderId               String
+  provider              PaymentProvider @default(STRIPE)
+  status                PaymentStatus   @default(PROCESSING)
+  amountCents           Int
+  currency              String          @default("USD")
+  stripePaymentIntentId String?         @unique
+  stripeChargeId        String?
+  applicationFeeCents   Int             @default(0)
+  failureReason         String?
+  paidAt                DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds  Refund[]
+  disputes Dispute[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([orderId])
+  @@map("payments")
+}
+
+/// Refund against a payment. For destination charges, reverse_transfer pulls
+/// funds back from the connected account; refundApplicationFee returns platform fee.
+model Refund {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  orderId              String
+  paymentId            String
+  amountCents          Int
+  currency             String   @default("USD")
+  reason               String?
+  reverseTransfer      Boolean  @default(true)
+  refundApplicationFee Boolean  @default(false)
+  stripeRefundId       String?  @unique
+  createdAt            DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("refunds")
+}
+
+/// Discount / promotion. Mirrors Stripe Coupon where applicable.
+model Discount {
+  id              String    @id @default(cuid())
+  tenantId        String
+  code            String
+  description     String?
+  type            String    @default("percentage") // percentage|fixed_amount|free_shipping
+  valueCents      Int? // for fixed_amount
+  percentage      Int? // 0..100 for percentage
+  stripeCouponId  String?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  maxRedemptions  Int?
+  timesRedeemed   Int       @default(0)
+  isActive        Boolean   @default(true)
+  aiGenerated     Boolean   @default(false) // AI Marketing agent campaigns
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("discounts")
+}
+
+/// Gift card with a custom balance ledger (Stripe has no native gift-card product).
+model GiftCard {
+  id               String    @id @default(cuid())
+  tenantId         String
+  code             String
+  initialBalanceCents Int
+  balanceCents     Int
+  currency         String    @default("USD")
+  customerId       String?
+  stripeCouponId   String? // backing single-use coupon for redemption
+  expiresAt        DateTime?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("gift_cards")
+}
+
+/// Per-tenant Stripe Connect account. Tenants charge through their own connected
+/// account (destination charges); platform takes application_fee_amount. Mirrors
+/// Stripe account capability/onboarding state for the connect status UI.
+model ConnectAccount {
+  id               String   @id @default(cuid())
+  tenantId         String   @unique
+  stripeAccountId  String   @unique
+  chargesEnabled   Boolean  @default(false)
+  payoutsEnabled   Boolean  @default(false)
+  detailsSubmitted Boolean  @default(false)
+  requirements     Json     @default("{}") // currently_due / past_due / disabled_reason
+  country          String? // ISO-3166-1 alpha-2
+  defaultCurrency  String   @default("USD")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("connect_accounts")
+}
+
+/// Stripe dispute / chargeback against a payment. Tracks liability window and
+/// response deadline; evidence is assembled in DisputeEvidence rows and submitted
+/// once before evidenceDueBy.
+model Dispute {
+  id              String        @id @default(cuid())
+  tenantId        String
+  paymentId       String
+  stripeDisputeId String        @unique
+  amountCents     Int
+  currency        String        @default("USD")
+  status          DisputeStatus @default(NEEDS_RESPONSE)
+  reason          String? // stripe dispute.reason (fraudulent, product_not_received, ...)
+  evidenceDueBy   DateTime?
+  submittedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment  Payment           @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  evidence DisputeEvidence[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([paymentId])
+  @@index([status])
+  @@map("disputes")
+}
+
+/// A single piece of evidence attached to a Dispute (text or media-backed).
+model DisputeEvidence {
+  id           String              @id @default(cuid())
+  tenantId     String
+  disputeId    String
+  type         DisputeEvidenceType
+  text         String?
+  mediaAssetId String? // optional MediaAsset backing (receipt/shipping doc image/PDF)
+  createdAt    DateTime            @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([disputeId])
+  @@map("dispute_evidence")
+}
+
+// =============================================================================
+// MODULE: shipping — Shipping & Fulfillment  (Phase P1)
+// =============================================================================
+
+/// Shipment / fulfillment. Aggregator label URLs expire — cache to S3/R2 and
+/// store the cached URL. Provider abstraction: Shippo (P1), PostNord (P2).
+model Shipment {
+  id              String         @id @default(cuid())
+  tenantId        String
+  orderId         String
+  status          ShipmentStatus @default(PENDING)
+  carrier         String? // "USPS","Bring","PostNord",...
+  service         String?
+  trackingNumber  String?
+  trackingUrl     String?
+  labelUrlCached  String? // cached to S3/R2 (aggregator URLs expire)
+  rateAmountCents Int?
+  currency        String         @default("USD")
+  provider        String         @default("SHIPPO") // SHIPPO|EASYPOST|POSTNORD
+  weightGrams     Int?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([orderId])
+  @@index([trackingNumber])
+  @@map("shipments")
+}
+
+// =============================================================================
+// MODULE: media — Media & Storage  (Phase P1)
+// =============================================================================
+
+/// Any uploaded/derived asset in S3-compatible storage. Source videos, extracted
+/// frames, product images, theme assets. temp/ prefix frames have 48h lifecycle.
+model MediaAsset {
+  id            String      @id @default(cuid())
+  tenantId      String
+  type          MediaType
+  status        MediaStatus @default(UPLOADING)
+  bucket        String
+  objectKey     String // path within bucket
+  url           String? // public/CDN URL when READY
+  mimeType      String?
+  sizeBytes     Int?
+  width         Int?
+  height        Int?
+  durationMs    Int? // for video/audio
+  checksumSha256 String?
+  phash         String? // perceptual hash for frame dedup
+  isTemporary   Boolean     @default(false) // temp/ prefix -> 48h expiry
+  uploadedById  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productImages     ProductImage[]
+  extractionJobs    ExtractionJob[] @relation("ExtractionSourceMedia")
+  extractionFrames  ExtractionFrame[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([type])
+  @@index([status])
+  @@map("media_assets")
+}
+
+// =============================================================================
+// MODULE: ai-extraction — AI Product Extraction Engine [FLAGSHIP]  (Phase P2)
+// =============================================================================
+
+/// Top-level extraction job: one uploaded video/photo-batch -> draft catalog.
+/// Drives the 5-stage BullMQ pipeline. NEVER auto-publishes (human gate).
+model ExtractionJob {
+  id              String              @id @default(cuid())
+  tenantId        String
+  storeId         String?
+  sourceMediaId   String?
+  source          ExtractionSource    @default(VIDEO)
+  status          ExtractionJobStatus @default(QUEUED)
+  // Pipeline accounting
+  durationSeconds Int? // source video length (drives credit cost)
+  framesExtracted Int                 @default(0)
+  framesAnalyzed  Int                 @default(0)
+  productsFound   Int                 @default(0)
+  // AI provider routing (Gemini primary, Claude fallback per research)
+  primaryProvider AiProvider          @default(GEMINI)
+  fallbackProvider AiProvider         @default(ANTHROPIC)
+  // Cost & credits
+  aiCostMicros    Int                 @default(0) // AI spend in USD micros
+  creditsConsumed Int                 @default(0)
+  // Idempotency: deterministic dedup key (tenantId+s3ETag) for BullMQ
+  dedupKey        String?             @unique
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  publishedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceMedia MediaAsset?        @relation("ExtractionSourceMedia", fields: [sourceMediaId], references: [id])
+  frames      ExtractionFrame[]
+  results     ExtractionResult[]
+  reviewItems ExtractionReviewItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([status])
+  @@map("extraction_jobs")
+}
+
+/// A keyframe extracted from the source video and the per-frame AI analysis.
+model ExtractionFrame {
+  id            String     @id @default(cuid())
+  tenantId      String
+  jobId         String
+  mediaId       String? // frame stored in temp/ prefix
+  frameIndex    Int
+  timestampMs   Int?
+  blurScore     Float? // Laplacian variance; low => motion blur
+  barcode       String? // ZXing result, if any
+  providerUsed  AiProvider?
+  rawResponse   Json? // raw LLM JSON (audit/debug)
+  confidence    Float? // overall frame confidence 0..1
+  createdAt     DateTime   @default(now())
+
+  job   ExtractionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  media MediaAsset?   @relation(fields: [mediaId], references: [id])
+
+  @@index([tenantId])
+  @@index([jobId])
+  @@map("extraction_frames")
+}
+
+/// A deduplicated candidate product produced by the pipeline. Becomes a Product
+/// only after the human verification gate accepts it. Holds per-field confidence.
+model ExtractionResult {
+  id             String   @id @default(cuid())
+  tenantId       String
+  jobId          String
+  // Draft product fields
+  title          String?
+  description    String?
+  priceCents     Int?
+  currency       String?
+  barcode        String?
+  brandGuess     String?
+  categoryGuess  String?
+  variantsGuess  Json? // [{size,color,price}]
+  imageMediaIds  Json     @default("[]")
+  // Shelf-quantity estimation (facing count) -> seeds InventoryItem via
+  // StockMovementType.EXTRACTION_SEED at publish time.
+  estimatedFacings  Int?
+  estimatedQuantity Int?
+  quantityConfidence Float?
+  // Confidence (research: 0..1 with per-field breakdown drives review triage)
+  overallConfidence Float @default(0)
+  fieldConfidence Json   @default("{}")
+  // Dedup linkage (pgvector cosine >= 0.92)
+  dedupGroupKey  String?
+  sourceFrameIds Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job        ExtractionJob         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reviewItem ExtractionReviewItem?
+  product    Product?
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([jobId])
+  @@index([overallConfidence])
+  @@map("extraction_results")
+}
+
+/// The human verification gate. One row per draft product awaiting owner review.
+/// Owner accepts/edits/rejects/merges/splits before anything is published.
+model ExtractionReviewItem {
+  id               String         @id @default(cuid())
+  tenantId         String
+  jobId            String
+  resultId         String         @unique
+  decision         ReviewDecision @default(PENDING)
+  reviewedByUserId String?
+  editedFields     Json? // owner overrides applied at review time
+  mergedIntoId     String? // when MERGED into another review item
+  reviewedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job    ExtractionJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  result ExtractionResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([jobId])
+  @@index([decision])
+  @@map("extraction_review_items")
+}
+
+// =============================================================================
+// MODULE: ai-core — AI Provider Abstraction & Agent Orchestration  (Phase P2)
+// MODULE: content — AI Content Generation  (Phase P2)
+// =============================================================================
+
+/// A single run of any AI agent (Extraction/Product/SEO/Content/Marketing/...).
+/// Provider-agnostic record emitted by packages/ai-core. Drives observability.
+model AiAgentRun {
+  id           String      @id @default(cuid())
+  tenantId     String
+  agent        AiAgentType
+  provider     AiProvider
+  model        String
+  status       AiRunStatus @default(RUNNING)
+  inputRefType String? // "extraction_job" | "product" | "store" ...
+  inputRefId   String?
+  promptTokens Int         @default(0)
+  outputTokens Int         @default(0)
+  latencyMs    Int?
+  costMicros   Int         @default(0)
+  creditsCharged Int       @default(0)
+  errorMessage String?
+  metadata     Json        @default("{}")
+  createdAt    DateTime    @default(now())
+  completedAt  DateTime?
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usageEvents AiUsageEvent[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([agent])
+  @@index([provider])
+  @@map("ai_agent_runs")
+}
+
+/// Fine-grained 'ai.usage' event (provider/model/tokens). Billing subscribes
+/// to deduct credits. Separated from AiAgentRun for high-volume metering.
+model AiUsageEvent {
+  id           String     @id @default(cuid())
+  tenantId     String
+  agentRunId   String?
+  provider     AiProvider
+  model        String
+  operation    String // "vision","completion","embedding"
+  inputTokens  Int        @default(0)
+  outputTokens Int        @default(0)
+  imageCount   Int        @default(0)
+  costMicros   Int        @default(0)
+  creditType   CreditType?
+  creditsCharged Int      @default(0)
+  createdAt    DateTime   @default(now())
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agentRun AiAgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([provider])
+  @@map("ai_usage_events")
+}
+
+// =============================================================================
+// MODULE: store-builder / theme-engine — AI Store Builder & Themes (Phase P3)
+// =============================================================================
+
+/// AI-generated (or hand-edited) theme configuration for a store. Versioned;
+/// the active version is referenced by Store.activeThemeId.
+model ThemeConfig {
+  id           String   @id @default(cuid())
+  tenantId     String
+  storeId      String
+  name         String
+  version      Int      @default(1)
+  isActive     Boolean  @default(false)
+  // Design tokens & layout (AI Theme Generation output)
+  tokens       Json     @default("{}") // colors, typography, spacing, radius
+  layout       Json     @default("{}") // section order, hero config
+  cssOverrides String?
+  // Website-cloning provenance (visual inspiration, not copying)
+  inspirationSourceUrl String?
+  aiGenerated  Boolean  @default(true)
+  generatedByRunId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store        Store   @relation("StoreThemeConfigs", fields: [storeId], references: [id], onDelete: Cascade)
+  activeForStores Store[] @relation("StoreActiveTheme")
+
+  @@unique([storeId, version])
+  @@index([tenantId])
+  @@index([storeId])
+  @@map("theme_configs")
+}
+
+// =============================================================================
+// MODULE: search — Search (Meilisearch)  (Phase P1)
+// =============================================================================
+
+/// Outbox/sync record tracking Meilisearch index state per entity. A worker
+/// reconciles Postgres -> Meilisearch and records the result here.
+model SearchSyncJob {
+  id          String   @id @default(cuid())
+  tenantId    String
+  entityType  String // "product" | "category"
+  entityId    String
+  operation   String // "upsert" | "delete"
+  indexUid    String // per-tenant index uid
+  status      String   @default("pending") // pending|synced|failed
+  attempts    Int      @default(0)
+  lastError   String?
+  syncedAt    DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("search_sync_jobs")
+}
+
+// =============================================================================
+// MODULE: notifications — Notifications (email/chat)  (Phase P1)
+// =============================================================================
+
+model Notification {
+  id          String              @id @default(cuid())
+  tenantId    String
+  channel     NotificationChannel @default(EMAIL)
+  status      NotificationStatus  @default(PENDING)
+  template    String // "order_confirmation","extraction_ready",...
+  toAddress   String? // email/phone/webhook URL
+  subject     String?
+  payload     Json                @default("{}")
+  refType     String?
+  refId       String?
+  providerMessageId String?
+  sentAt      DateTime?
+  failureReason String?
+  createdAt   DateTime            @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([status])
+  @@map("notifications")
+}
+
+// =============================================================================
+// MODULE: google + marketing — Integrations & Marketing  (Phase P4)
+// =============================================================================
+
+/// Per-tenant OAuth connection to a Google (or other) ecosystem service.
+/// Stores encrypted tokens + service identifiers. Handles partial-grant scopes.
+model OAuthConnection {
+  id             String              @id @default(cuid())
+  tenantId       String
+  provider       IntegrationProvider
+  externalAccountId String?
+  // Encrypted token material (app-layer envelope encryption)
+  accessToken    String? // encrypted
+  refreshToken   String? // encrypted
+  tokenExpiry    DateTime?
+  grantedScopes  Json                @default("[]") // consent unbundling (May 2025)
+  // Google service identifiers (per research digest)
+  merchantId     String?
+  ga4PropertyId  String?
+  ga4MeasurementId String?
+  ga4ApiSecret   String? // encrypted
+  gbpAccountId   String?
+  gscSiteUrl     String?
+  gtmContainerId String?
+  status         String              @default("connected") // connected|reconnect_required|revoked
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+  @@map("oauth_connections")
+}
+
+/// Generic non-OAuth integration connection (shipping aggregators, ad APIs
+/// using API keys, SendGrid, etc.). Secrets stored encrypted / referenced.
+model IntegrationConnection {
+  id         String              @id @default(cuid())
+  tenantId   String
+  provider   IntegrationProvider
+  isActive   Boolean             @default(true)
+  config     Json                @default("{}") // non-secret config
+  secretRef  String? // pointer into secrets manager (Doppler), not raw secret
+  lastSyncAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+  @@map("integration_connections")
+}
+
+/// AI Marketing Agent campaign across ad channels. Drafts require human approval.
+model AdCampaign {
+  id          String           @id @default(cuid())
+  tenantId    String
+  channel     AdCampaignChannel
+  status      AdCampaignStatus @default(DRAFT)
+  name        String
+  objective   String?
+  budgetCents Int              @default(0)
+  currency    String           @default("USD")
+  externalCampaignId String?
+  // AI-generated creative awaiting human verification
+  creative    Json             @default("{}")
+  aiGenerated Boolean          @default(true)
+  generatedByRunId String?
+  approvedByUserId String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  // Performance rollup
+  impressions Int              @default(0)
+  clicks      Int              @default(0)
+  spendCents  Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([channel])
+  @@map("ad_campaigns")
+}
+
+// =============================================================================
+// MODULE: analytics — Analytics & Business Intelligence  (Phase P4)
+// =============================================================================
+
+/// Pre-aggregated daily metrics per tenant/store for dashboards & AI Analytics
+/// agent. Raw events live in GA4 / event stream; this is the BI rollup.
+model AnalyticsSnapshot {
+  id            String   @id @default(cuid())
+  tenantId      String
+  storeId       String?
+  date          DateTime // day bucket (UTC midnight)
+  // Core KPIs
+  visits        Int      @default(0)
+  uniqueVisitors Int     @default(0)
+  orders        Int      @default(0)
+  unitsSold     Int      @default(0)
+  grossSalesCents Int    @default(0)
+  netSalesCents Int      @default(0)
+  refundsCents  Int      @default(0)
+  conversionBps Int      @default(0) // basis points
+  aovCents      Int      @default(0) // average order value
+  // AI cost attribution
+  aiCostMicros  Int      @default(0)
+  metrics       Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, storeId, date])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@map("analytics_snapshots")
+}
+
+// =============================================================================
+// MODULE: automation — Automation Engine  (Phase P5)
+// =============================================================================
+
+/// A tenant automation rule (trigger -> conditions -> actions). Executed by the
+/// worker; AI agents can be actions. Drives marketing, inventory, ops workflows.
+model Automation {
+  id          String            @id @default(cuid())
+  tenantId    String
+  name        String
+  trigger     AutomationTrigger
+  isActive    Boolean           @default(true)
+  conditions  Json              @default("[]")
+  actions     Json              @default("[]") // ordered action list
+  cron        String? // for SCHEDULE_CRON triggers
+  lastRunAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   AutomationRun[]
+
+  @@index([tenantId])
+  @@index([trigger])
+  @@map("automations")
+}
+
+model AutomationRun {
+  id           String              @id @default(cuid())
+  tenantId     String
+  automationId String
+  status       AutomationRunStatus @default(PENDING)
+  triggeredBy  String? // event id / cron
+  context      Json                @default("{}")
+  result       Json                @default("{}")
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime            @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([automationId])
+  @@map("automation_runs")
+}
+
+// =============================================================================
+// CROSS-CUTTING: Webhooks, Audit, Compliance (GDPR)
+// =============================================================================
+
+/// Outbound webhook endpoint registered by a tenant/integration.
+model WebhookEndpoint {
+  id         String   @id @default(cuid())
+  tenantId   String
+  url        String
+  secret     String // HMAC signing secret (encrypted)
+  events     Json     @default("[]") // subscribed event types
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([tenantId])
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  tenantId     String
+  endpointId   String
+  eventType    String
+  payload      Json
+  responseCode Int?
+  attempts     Int      @default(0)
+  deliveredAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([endpointId])
+  @@map("webhook_deliveries")
+}
+
+/// Immutable audit log. DB-level immutability enforced via INSERT-only RULE
+/// (P0–P3) and migrated to S3 Object Lock WORM before SOC 2 Type II.
+model AuditLog {
+  id         String      @id @default(cuid())
+  tenantId   String? // null for platform-level events
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  ip         String?
+  userAgent  String?
+  before     Json?
+  after      Json?
+  metadata   Json        @default("{}")
+  createdAt  DateTime    @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+/// GDPR Data Subject Access Request (export/erasure). Processed by worker;
+/// 30-day SLA. Tenant = controller, AICOS = processor for end-customer data.
+model DsarRequest {
+  id           String     @id @default(cuid())
+  tenantId     String
+  type         DsarType
+  status       DsarStatus @default(RECEIVED)
+  subjectEmail String
+  subjectType  String     @default("customer") // customer|user
+  resultUrl    String? // export bundle (signed, expiring)
+  completedAt  DateTime?
+  dueAt        DateTime // received + 30 days
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("dsar_requests")
+}
