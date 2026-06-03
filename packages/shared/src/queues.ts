@@ -63,6 +63,10 @@ export interface StripeEventJobData {
   type: string;
   /** Tenant resolved from the event's customer/metadata, when known. */
   tenantId?: string;
+  /** The signature-verified Stripe.Event as received (for the worker to act on). */
+  payload?: unknown;
+  /** ISO timestamp the API verified + enqueued the event. */
+  receivedAt?: string;
 }
 
 /**
@@ -70,6 +74,9 @@ export interface StripeEventJobData {
  * for an id that already exists (waiting/active/completed), giving safe
  * at-least-once redelivery with no extra Redis bookkeeping. Producers and the
  * worker MUST derive ids the same way, so the helper lives here.
+ *
+ * NOTE: BullMQ rejects custom job ids containing ":" (it reserves the colon for
+ * its own Redis key namespacing), so the parts are joined with "__".
  */
 export function extractionJobId(
   tenantId: string,
@@ -77,5 +84,5 @@ export function extractionJobId(
   segmentIndex: number,
   stage: ExtractionStage,
 ): string {
-  return `${tenantId}:${s3ETag}:${segmentIndex}:${stage}`;
+  return ['x', tenantId, s3ETag, String(segmentIndex), stage].join('__');
 }

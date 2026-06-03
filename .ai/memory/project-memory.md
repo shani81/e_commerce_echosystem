@@ -18,5 +18,10 @@ Durable discoveries, lessons, and reusable insights. Append newest at top.
 - **Tailwind config can't import the `@aicos/ui` barrel** (it pulls in `.tsx` components Node can't resolve at config-eval time) — import tokens from `packages/ui/src/tokens` directly.
 - **Bootstrap a fresh clone:** `pnpm install` → `pnpm infra:up` → `pnpm db:setup` (generate→push→rls→seed).
 
+## 2026-06-03 — Stripe webhook + queue-contract lessons
+- **Producer/consumer queue contracts must be single-sourced.** The api enqueued job name `stripe-webhook` while the worker only handled `stripe.event` — so verified webhooks were silently ignored. Fixed by making `@aicos/shared` the one source of `QUEUE_NAMES`/`BILLING_JOBS`/payload types; both api and worker import it. Always check both ends when touching a queue.
+- **Stripe SDK constructor throws on an empty `apiKey`** (`Neither apiKey nor config.authenticator provided`). `.env` often has `STRIPE_SECRET_KEY=` (present-but-empty), and `?? fallback` does NOT catch `''` — use `|| fallback`. Webhook `constructEvent` only needs the webhook secret, not the API key.
+- **Verify against `req.rawBody`** (enabled by `rawBody:true` in main.ts) — JSON re-serialization changes bytes and breaks the HMAC. Idempotency: `jobId = event.id` dedupes at the queue; a Redis processed-marker (set after success) covers redelivery after job eviction.
+
 ## Lessons learned (older)
 - _(none yet)_

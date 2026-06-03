@@ -1,20 +1,14 @@
 /**
- * BullMQ contract for billing. The queue name and job names are the integration
- * boundary with the worker app (which owns the processor — NOT created here).
- * Keep these stable; changing them requires a coordinated worker deploy.
+ * Billing BullMQ contract.
+ *
+ * The canonical queue/job names + payload shapes live in `@aicos/shared` so the
+ * API (producer) and the worker (consumer) stay in lockstep — a job enqueued
+ * here is typed and named exactly as the worker's processor expects. This module
+ * just re-exports them (plus the `BILLING_QUEUE` alias) for local imports.
  */
-export const BILLING_QUEUE = 'billing';
+import { QUEUE_NAMES } from '@aicos/shared';
 
-export const BILLING_JOBS = {
-  STRIPE_WEBHOOK: 'stripe-webhook',
-} as const;
+export { QUEUE_NAMES, BILLING_JOBS, type StripeEventJobData } from '@aicos/shared';
 
-/** Payload enqueued for each received Stripe webhook event. */
-export interface StripeWebhookJobData {
-  /** Stripe event id (used by the worker for idempotency). */
-  eventId: string;
-  eventType: string;
-  /** Raw event JSON as received (already signature-verified at enqueue time). */
-  payload: unknown;
-  receivedAt: string;
-}
+/** The billing queue name (alias of `QUEUE_NAMES.billing`). */
+export const BILLING_QUEUE = QUEUE_NAMES.billing;

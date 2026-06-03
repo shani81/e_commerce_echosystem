@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
 import { StripeWebhookController } from './stripe-webhook.controller';
+import { StripeService } from './stripe.service';
 import { BILLING_QUEUE } from './billing.constants';
 
 /**
@@ -13,7 +14,7 @@ import { BILLING_QUEUE } from './billing.constants';
 @Module({
   imports: [BullModule.registerQueue({ name: BILLING_QUEUE })],
   controllers: [BillingController, StripeWebhookController],
-  providers: [BillingService],
-  exports: [BillingService],
+  providers: [BillingService, StripeService],
+  exports: [BillingService, StripeService],
 })
 export class BillingModule {}

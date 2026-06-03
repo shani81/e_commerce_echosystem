@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthController } from './health/health.controller';
 
@@ -56,6 +57,7 @@ import { HealthController } from './health/health.controller';
       },
     }),
     PrismaModule,
+    RedisModule,
     QueuesModule,
   ],
   controllers: [HealthController],

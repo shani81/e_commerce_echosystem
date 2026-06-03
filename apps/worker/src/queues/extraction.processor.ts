@@ -7,9 +7,8 @@ import {
   type ExtractionJobData,
   type ExtractionStage,
 } from './contracts';
-// Runtime import (NOT `import type`): Nest's DI needs the class reference in the
-// emitted decorator metadata to resolve this constructor injection.
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+// Runtime (value) import — Nest's DI needs the class reference in the emitted
+// decorator metadata to resolve this constructor injection.
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
