@@ -18,6 +18,8 @@ import { HttpMetricsInterceptor } from './metrics/http-metrics.interceptor';
 import { CatalogModule } from './catalog/catalog.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { MediaModule } from './media/media.module';
+import { SearchModule } from './search/search.module';
+import { StorefrontModule } from './storefront/storefront.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -80,6 +82,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     CatalogModule,
     InventoryModule,
     MediaModule,
+    SearchModule,
+    StorefrontModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -5,6 +5,7 @@ import { CategoriesService } from './categories.service';
 import { CategoriesController } from './categories.controller';
 import { BrandsService } from './brands.service';
 import { BrandsController } from './brands.controller';
+import { SearchModule } from '../search/search.module';
 
 /**
  * Catalog module — tenant-scoped CRUD over products (+ variants & images),
@@ -13,6 +14,7 @@ import { BrandsController } from './brands.controller';
  * only registers its own controllers and services.
  */
 @Module({
+  imports: [SearchModule],
   controllers: [ProductsController, CategoriesController, BrandsController],
   providers: [ProductsService, CategoriesService, BrandsService],
   exports: [ProductsService, CategoriesService, BrandsService],

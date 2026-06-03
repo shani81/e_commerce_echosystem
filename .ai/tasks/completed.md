@@ -3,6 +3,16 @@
 > Work finished. Append newest at top. We are in **PHASE 1 — Core Commerce**; Phase 0 (foundation) is complete (exit review GO).
 > Last updated: 2026-06-03.
 
+## 2026-06-03 — Phase 1 · M1.2 Search & storefront (Meilisearch + public browse)
+
+| ID | Description | Evidence |
+|----|-------------|----------|
+| C1-007 | **Search (API)** — Meilisearch products index (settings + per-tenant filtering; graceful no-op without a key); indexer syncs on catalog product/variant mutations; `/search/products` (tenant search), `/search/reindex`, `/search/token` (per-tenant scoped token, 1h). | `apps/api/src/search/**` |
+| C1-008 | **Public storefront (API)** — store-slug → tenant resolution; PUBLISHED-only browse/search (Meili-backed, DB fallback) + product detail. `/storefront/:slug[/products[/:productSlug]]`. | `apps/api/src/storefront/**` |
+| C1-009 | **Web storefront** — `/shop` (search + product grid) + `/products/[slug]` (detail) via a public client; landing links to it. | `apps/web/src/{app/shop,app/products,lib/storefront-api}` |
+| C1-010 | **Fix** — RBAC guard treats `*:*` as a full grant (seeded owner role). | `apps/api/src/common/guards/roles.guard.ts` |
+| C1-011 | **Verified live** — smoke 13/13: login → create+publish → tenant search (total=1) → reindex → token → storefront browse/detail (product present) → 404 on bogus store. typecheck 14/14, lint 13/13, build 9/9. | smoke |
+
 ## 2026-06-03 — Phase 1 · M1.1 Core Commerce (catalog + inventory + media APIs)
 
 | ID | Description | Evidence |

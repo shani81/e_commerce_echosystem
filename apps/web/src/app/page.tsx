@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@aicos/ui';
+import Link from 'next/link';
 import { ApiHealth } from '@/components/api-health';
 
 const STEPS = [
@@ -42,15 +43,20 @@ export default function HomePage() {
             </span>
             <span className="text-lg font-semibold tracking-tight text-neutral-900">AICOS</span>
             <Badge variant="brand" className="ml-1">
-              Phase 0
+              Phase 1
             </Badge>
           </div>
-          <a
-            href="http://localhost:3100"
-            className="text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900"
-          >
-            Admin →
-          </a>
+          <nav className="flex items-center gap-5 text-sm font-medium text-neutral-600">
+            <Link href="/shop" className="transition-colors hover:text-neutral-900">
+              Shop
+            </Link>
+            <a
+              href="http://localhost:3100"
+              className="transition-colors hover:text-neutral-900"
+            >
+              Admin →
+            </a>
+          </nav>
         </header>
 
         {/* Hero */}

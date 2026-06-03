@@ -50,7 +50,9 @@ export class RolesGuard implements CanActivate {
   }
 
   private isGranted(required: string, granted: Set<string>): boolean {
-    if (granted.has('*')) return true;
+    // Global wildcards — both `*` and `*:*` grant everything (the seeded owner /
+    // super-admin roles use one or the other).
+    if (granted.has('*') || granted.has('*:*')) return true;
     if (granted.has(required)) return true;
     const [resource] = required.split(':');
     return granted.has(`${resource}:*`);

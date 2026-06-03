@@ -6,6 +6,7 @@ import {
 import { Prisma, ProductStatus, type Product } from '@aicos/db';
 import { skuFromTitle, slugify } from '@aicos/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { SearchIndexerService } from '../search/search-indexer.service';
 import type { PaginatedResult } from '../common/dto/pagination.dto';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
@@ -22,7 +23,10 @@ import type { CreateProductImageDto } from './dto/create-product-image.dto';
  */
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly indexer: SearchIndexerService,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // Products
@@ -31,7 +35,7 @@ export class ProductsService {
   async create(tenantId: string, dto: CreateProductDto) {
     const slug = dto.slug ?? slugify(dto.title);
     try {
-      return await this.prisma.forTenant(tenantId, (tx) =>
+      const product = await this.prisma.forTenant(tenantId, (tx) =>
         tx.product.create({
           data: {
             tenantId,
@@ -48,6 +52,8 @@ export class ProductsService {
           },
         }),
       );
+      await this.indexer.syncProduct(tenantId, product.id);
+      return product;
     } catch (err) {
       throw this.mapProductSlugConflict(err, slug);
     }
@@ -135,9 +141,11 @@ export class ProductsService {
     }
 
     try {
-      return await this.prisma.forTenant(tenantId, (tx) =>
+      const product = await this.prisma.forTenant(tenantId, (tx) =>
         tx.product.update({ where: { id }, data }),
       );
+      await this.indexer.syncProduct(tenantId, id);
+      return product;
     } catch (err) {
       throw this.mapProductSlugConflict(err, dto.slug);
     }
@@ -149,18 +157,21 @@ export class ProductsService {
     await this.prisma.forTenant(tenantId, (tx) =>
       tx.product.update({ where: { id }, data: { deletedAt: new Date() } }),
     );
+    await this.indexer.removeProduct(id);
     return { id, deleted: true };
   }
 
   /** Publish: move status to ACTIVE (the schema's sellable/published value). */
   async publish(tenantId: string, id: string) {
     await this.assertProductExists(tenantId, id);
-    return this.prisma.forTenant(tenantId, (tx) =>
+    const product = await this.prisma.forTenant(tenantId, (tx) =>
       tx.product.update({
         where: { id },
         data: { status: ProductStatus.ACTIVE, publishedAt: new Date() },
       }),
     );
+    await this.indexer.syncProduct(tenantId, id);
+    return product;
   }
 
   // ---------------------------------------------------------------------------
@@ -175,7 +186,7 @@ export class ProductsService {
     const product = await this.assertProductExists(tenantId, productId);
     const sku = dto.sku ?? skuFromTitle(product.title, [dto.title]);
     try {
-      return await this.prisma.forTenant(tenantId, (tx) =>
+      const variant = await this.prisma.forTenant(tenantId, (tx) =>
         tx.productVariant.create({
           data: {
             tenantId,
@@ -195,13 +206,15 @@ export class ProductsService {
           },
         }),
       );
+      await this.indexer.syncProduct(tenantId, productId);
+      return variant;
     } catch (err) {
       throw this.mapVariantSkuConflict(err, sku);
     }
   }
 
   async updateVariant(tenantId: string, id: string, dto: UpdateVariantDto) {
-    await this.assertVariantExists(tenantId, id);
+    const existing = await this.assertVariantExists(tenantId, id);
     const data: Prisma.ProductVariantUpdateInput = {};
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.sku !== undefined) data.sku = dto.sku;
@@ -223,9 +236,11 @@ export class ProductsService {
     if (dto.position !== undefined) data.position = dto.position;
 
     try {
-      return await this.prisma.forTenant(tenantId, (tx) =>
+      const variant = await this.prisma.forTenant(tenantId, (tx) =>
         tx.productVariant.update({ where: { id }, data }),
       );
+      await this.indexer.syncProduct(tenantId, existing.productId);
+      return variant;
     } catch (err) {
       throw this.mapVariantSkuConflict(err, dto.sku);
     }
@@ -233,13 +248,14 @@ export class ProductsService {
 
   /** Soft-delete a variant (sets `deletedAt`). */
   async removeVariant(tenantId: string, id: string) {
-    await this.assertVariantExists(tenantId, id);
+    const existing = await this.assertVariantExists(tenantId, id);
     await this.prisma.forTenant(tenantId, (tx) =>
       tx.productVariant.update({
         where: { id },
         data: { deletedAt: new Date() },
       }),
     );
+    await this.indexer.syncProduct(tenantId, existing.productId);
     return { id, deleted: true };
   }
 
