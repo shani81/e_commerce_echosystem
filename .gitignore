@@ -16,6 +16,7 @@ out/
 !.env.example
 *.pem
 *.key
+.keys/
 
 # Logs
 logs/

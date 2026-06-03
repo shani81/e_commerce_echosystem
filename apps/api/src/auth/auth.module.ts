@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -15,15 +14,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        // Default secret = access secret; refresh ops pass the refresh secret
-        // explicitly. Per-token expiry is set at sign time.
-        secret: config.getOrThrow<string>('jwt.accessSecret'),
-      }),
-    }),
+    // No global key: each call passes its key explicitly — RS256 access tokens
+    // sign with the private key / verify with the public key; HS256 refresh
+    // tokens use the refresh secret. Per-token expiry is set at sign time.
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

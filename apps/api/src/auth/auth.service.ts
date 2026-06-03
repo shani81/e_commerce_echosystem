@@ -44,7 +44,7 @@ interface RefreshTokenPayload {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly accessSecret: string;
+  private readonly accessPrivateKey: string;
   private readonly refreshSecret: string;
   private readonly accessTtl: string;
   private readonly refreshTtl: string;
@@ -54,7 +54,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     config: ConfigService,
   ) {
-    this.accessSecret = config.getOrThrow<string>('jwt.accessSecret');
+    this.accessPrivateKey = config.getOrThrow<string>('jwt.accessPrivateKey');
     this.refreshSecret = config.getOrThrow<string>('jwt.refreshSecret');
     this.accessTtl = config.get<string>('jwt.accessTtl') ?? '15m';
     this.refreshTtl = config.get<string>('jwt.refreshTtl') ?? '30d';
@@ -297,7 +297,8 @@ export class AuthService {
     };
 
     const accessToken = await this.jwt.signAsync(accessPayload, {
-      secret: this.accessSecret,
+      privateKey: this.accessPrivateKey,
+      algorithm: 'RS256',
       // `expiresIn` is typed against the `ms` StringValue template; our TTLs are
       // validated env strings (e.g. "15m") so we assert the compatible type.
       expiresIn: this.accessTtl as unknown as number,

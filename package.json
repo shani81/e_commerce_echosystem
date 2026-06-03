@@ -25,6 +25,7 @@
     "db:seed": "pnpm --filter @aicos/db seed",
     "db:studio": "pnpm --filter @aicos/db studio",
     "db:setup": "pnpm db:generate && pnpm db:push && pnpm db:rls && pnpm db:seed",
+    "keys:gen": "node scripts/gen-jwt-keys.mjs",
     "infra:up": "docker compose -f docker/docker-compose.yml --env-file .env up -d",
     "infra:down": "docker compose -f docker/docker-compose.yml down",
     "infra:logs": "docker compose -f docker/docker-compose.yml logs -f"

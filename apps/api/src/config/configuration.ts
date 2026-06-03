@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
 /**
@@ -24,7 +26,14 @@ export const envSchema = z.object({
   REDIS_URL: z.string().url(),
 
   // --- Auth / JWT -----------------------------------------------------------
-  JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET must be >= 16 chars'),
+  // Access tokens are RS256 (asymmetric): other services verify them with the
+  // PUBLIC key, never holding a signing secret. Keys are loaded from `.keys/`
+  // (run `pnpm keys:gen`) or, for CI/prod, inline via env (PEM or base64).
+  JWT_PRIVATE_KEY: z.string().optional(),
+  JWT_PUBLIC_KEY: z.string().optional(),
+  JWT_PRIVATE_KEY_PATH: z.string().optional(),
+  JWT_PUBLIC_KEY_PATH: z.string().optional(),
+  // Refresh tokens stay HS256 (symmetric) — only this API verifies them.
   JWT_REFRESH_SECRET: z
     .string()
     .min(16, 'JWT_REFRESH_SECRET must be >= 16 chars'),
@@ -54,9 +63,48 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   return parsed.data;
 }
 
+const DEFAULT_PRIVATE_KEY_REL = '.keys/jwt_access_private.pem';
+const DEFAULT_PUBLIC_KEY_REL = '.keys/jwt_access_public.pem';
+
+/** Walk up from the CWD (max 5 levels) looking for a repo-relative file. */
+function findUp(rel: string): string | null {
+  let dir = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    const candidate = resolve(dir, rel);
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+/**
+ * Resolve a PEM key from, in priority order: an inline value (PEM or base64),
+ * an explicit file path, or the default `.keys/` location found by walking up
+ * from the CWD. Throws a readable error when nothing is found.
+ */
+function resolveKey(
+  inline: string | undefined,
+  explicitPath: string | undefined,
+  defaultRel: string,
+  envVar: string,
+): string {
+  if (inline && inline.trim()) {
+    const v = inline.trim();
+    return v.includes('BEGIN') ? v : Buffer.from(v, 'base64').toString('utf8');
+  }
+  const path = explicitPath ? resolve(process.cwd(), explicitPath) : findUp(defaultRel);
+  if (path && existsSync(path)) return readFileSync(path, 'utf8');
+  throw new Error(
+    `Missing JWT key. Set ${envVar} (PEM or base64) or generate a dev keypair ` +
+      `with \`pnpm keys:gen\` (expected at ${defaultRel}).`,
+  );
+}
+
 /**
  * Structured configuration factory consumed by `ConfigModule.forRoot({ load })`.
- * Re-parses (cheap) so namespaced access (`config.get('jwt.accessSecret')`)
+ * Re-parses (cheap) so namespaced access (`config.get('jwt.accessPrivateKey')`)
  * works alongside flat access (`config.get('DATABASE_URL')`).
  */
 export function configuration() {
@@ -78,7 +126,20 @@ export function configuration() {
       url: env.REDIS_URL,
     },
     jwt: {
-      accessSecret: env.JWT_ACCESS_SECRET,
+      // RS256 access-token keypair (private signs, public verifies).
+      accessPrivateKey: resolveKey(
+        env.JWT_PRIVATE_KEY,
+        env.JWT_PRIVATE_KEY_PATH,
+        DEFAULT_PRIVATE_KEY_REL,
+        'JWT_PRIVATE_KEY',
+      ),
+      accessPublicKey: resolveKey(
+        env.JWT_PUBLIC_KEY,
+        env.JWT_PUBLIC_KEY_PATH,
+        DEFAULT_PUBLIC_KEY_REL,
+        'JWT_PUBLIC_KEY',
+      ),
+      // HS256 refresh secret.
       refreshSecret: env.JWT_REFRESH_SECRET,
       accessTtl: env.JWT_ACCESS_TTL,
       refreshTtl: env.JWT_REFRESH_TTL,

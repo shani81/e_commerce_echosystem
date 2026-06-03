@@ -19,8 +19,8 @@ interface AccessTokenClaims {
  *
  * Resolution order:
  *   1. A verified `Authorization: Bearer <accessToken>` — the trusted source for
- *      browser/user traffic. We verify the HS256 signature with
- *      `JWT_ACCESS_SECRET`; an invalid/expired token is simply ignored here
+ *      browser/user traffic. We verify the RS256 signature with the JWT public
+ *      key (algorithm pinned); an invalid/expired token is simply ignored here
  *      (route guards, not this middleware, decide 401s) so public routes keep
  *      working.
  *   2. `X-Tenant-Id` header — only honoured for internal service-to-service
@@ -34,13 +34,13 @@ interface AccessTokenClaims {
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
   private readonly logger = new Logger(TenantMiddleware.name);
-  private readonly accessSecret: string;
+  private readonly accessPublicKey: string;
 
   constructor(
     private readonly jwt: JwtService,
     config: ConfigService,
   ) {
-    this.accessSecret = config.getOrThrow<string>('jwt.accessSecret');
+    this.accessPublicKey = config.getOrThrow<string>('jwt.accessPublicKey');
   }
 
   use(req: Request, _res: Response, next: NextFunction): void {
@@ -50,7 +50,8 @@ export class TenantMiddleware implements NestMiddleware {
     if (token) {
       try {
         const claims = this.jwt.verify<AccessTokenClaims>(token, {
-          secret: this.accessSecret,
+          publicKey: this.accessPublicKey,
+          algorithms: ['RS256'],
         });
         store.userId = claims.sub;
         store.tenantId = claims.tid;

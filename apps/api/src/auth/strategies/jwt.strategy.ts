@@ -15,9 +15,9 @@ export interface AccessTokenPayload {
 }
 
 /**
- * passport-jwt strategy ('jwt'). Verifies the HS256 access token against
- * `JWT_ACCESS_SECRET`, then re-resolves the membership/role from the database so
- * a revoked membership or deleted role immediately invalidates the token.
+ * passport-jwt strategy ('jwt'). Verifies the RS256 access token with the JWT
+ * PUBLIC key, then re-resolves the membership/role from the database so a
+ * revoked membership or deleted role immediately invalidates the token.
  *
  * The membership/role lookup spans tenants (we resolve which tenant this token
  * is for), so it runs through `asSystem` — a sanctioned RLS-bypass auth path.
@@ -31,7 +31,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.getOrThrow<string>('jwt.accessSecret'),
+      // Verify with the RS256 PUBLIC key, and PIN the algorithm so an attacker
+      // can't downgrade to HS256 and forge tokens using the public key as the
+      // HMAC secret (the classic RS/HS confusion attack).
+      secretOrKey: config.getOrThrow<string>('jwt.accessPublicKey'),
+      algorithms: ['RS256'],
     });
   }
 
