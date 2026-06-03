@@ -20,6 +20,10 @@ import { InventoryModule } from './inventory/inventory.module';
 import { MediaModule } from './media/media.module';
 import { SearchModule } from './search/search.module';
 import { StorefrontModule } from './storefront/storefront.module';
+import { CartModule } from './cart/cart.module';
+import { CheckoutModule } from './checkout/checkout.module';
+import { ConnectModule } from './connect/connect.module';
+import { OrdersModule } from './orders/orders.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -84,6 +88,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     MediaModule,
     SearchModule,
     StorefrontModule,
+    CartModule,
+    CheckoutModule,
+    ConnectModule,
+    OrdersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

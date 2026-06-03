@@ -40,9 +40,39 @@ export const envSchema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('30d'),
 
-  // --- Billing / Stripe (skeleton — verification wired later) ---------------
+  // --- Billing / Stripe -----------------------------------------------------
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+
+  // --- Commerce / Checkout (M1.3) -------------------------------------------
+  // Platform take rate (Stripe Connect application fee), in basis points: 250 =
+  // 2.5%. Applied to the order subtotal as application_fee_amount on the
+  // destination charge. 0 = no platform fee (e.g. before Connect is live).
+  PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(0),
+  // Stripe Tax automatic calculation at Checkout. Off by default (requires Tax
+  // to be enabled on the Stripe account + origin address configured).
+  STRIPE_TAX_ENABLED: z.string().default('false'),
+  // Where Stripe Checkout returns the shopper. `{CHECKOUT_SESSION_ID}` is
+  // substituted by Stripe; the API also appends the order id.
+  CHECKOUT_SUCCESS_URL: z
+    .string()
+    .url()
+    .default('http://localhost:3000/checkout/success'),
+  CHECKOUT_CANCEL_URL: z
+    .string()
+    .url()
+    .default('http://localhost:3000/checkout/cancel'),
+  // Where Stripe Connect onboarding (AccountLink) returns the tenant owner — the
+  // admin app's payments settings. `refresh` is hit if the link expires.
+  CONNECT_REFRESH_URL: z
+    .string()
+    .url()
+    .default('http://localhost:3100/settings/connect?refresh=1'),
+  CONNECT_RETURN_URL: z
+    .string()
+    .url()
+    .default('http://localhost:3100/settings/connect?onboarded=1'),
 
   // --- Object storage / S3-compatible (MinIO locally, S3/R2 in prod) --------
   // Endpoint may be absent (e.g. in tests); presign throws a clear 503 then.
@@ -163,6 +193,15 @@ export function configuration() {
     stripe: {
       secretKey: env.STRIPE_SECRET_KEY,
       webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      publishableKey: env.STRIPE_PUBLISHABLE_KEY,
+    },
+    commerce: {
+      platformFeeBps: env.PLATFORM_FEE_BPS,
+      taxEnabled: env.STRIPE_TAX_ENABLED === 'true',
+      checkoutSuccessUrl: env.CHECKOUT_SUCCESS_URL,
+      checkoutCancelUrl: env.CHECKOUT_CANCEL_URL,
+      connectRefreshUrl: env.CONNECT_REFRESH_URL,
+      connectReturnUrl: env.CONNECT_RETURN_URL,
     },
     s3: {
       endpoint: env.S3_ENDPOINT,
