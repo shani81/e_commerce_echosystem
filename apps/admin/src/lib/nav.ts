@@ -58,8 +58,7 @@ export const navItems: NavItem[] = [
   },
   {
     label: 'AI Extraction',
-    href: '/ai-extraction',
+    href: '/extraction',
     icon: 'M12 3v2m0 14v2m9-9h-2M5 12H3m14.95 6.36l-1.41-1.41M6.46 6.46L5.05 5.05m13.9 0l-1.41 1.41M6.46 17.54l-1.41 1.41M15 12a3 3 0 11-6 0 3 3 0 016 0z',
-    placeholder: true,
   },
 ];

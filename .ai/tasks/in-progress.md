@@ -18,7 +18,8 @@
 | Item | Status | Notes |
 |------|--------|-------|
 | Extraction loop (vertical slice) | ✅ Kicked off | API `ExtractionModule` (`/extractions` create/list/get + **accept→DRAFT product** human gate, RBAC `extraction:*`); worker pipeline shape `QUEUED→INGESTING→ANALYZING→MERGING→AWAITING_REVIEW` persisting Frame/Result/ReviewItem; **mock analyzer** (3 products, per-field confidence) is the single swap-point for live AI. Verified — kickoff smoke 9/9. Plan + roadmap: `.ai/features/ai-product-extraction/kickoff.md`. |
-| Live AI (Gemini vision, FFmpeg, YOLO/ZXing, CLIP dedup, enrich) | 🟦 Next | Drop-in per the roadmap — no schema/contract changes needed. Implement `@aicos/ai-core` Gemini `vision()` first. Plus the admin review UI (triage bands). |
+| Admin review UI | ✅ Done | `/extraction` — jobs list + start-from-mediaId + inline **triage-band result grid** (confidence → High/Good/Review/Low) with **accept→DRAFT product**; 'AI Extraction' nav activated. Build green. |
+| Live AI (Gemini vision, FFmpeg, YOLO/ZXing, CLIP dedup, enrich) | 🟦 Next | Drop-in per the roadmap — no schema/contract changes. Implement `@aicos/ai-core` Gemini `vision()` first; add a media-upload UI; capture `order.shippingAddress` for Shippo. |
 
 ## Phase 1 milestones (✅ complete — see `.ai/architecture/reviews/p1-exit-review.md`)
 
