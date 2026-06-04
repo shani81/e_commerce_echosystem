@@ -25,9 +25,11 @@ export interface AnalyzeResult {
 
 const EXTRACTION_PROMPT =
   'You are a retail product-catalog extractor. From the shelf image(s), identify each distinct ' +
-  'product and return ONLY a JSON array (no prose, no code fences). Each element: ' +
+  'product and return ONLY a JSON array (no prose, no code fences). Read each product’s barcode ' +
+  '(GTIN/UPC/EAN) digits from the packaging whenever they are legible, and include a product for ' +
+  'every distinct barcode you can read even if the product name is uncertain. Each element: ' +
   '{"title": string, "priceCents": integer cents or null, "brand": string|null, ' +
-  '"category": string|null, "confidence": number 0..1, ' +
+  '"category": string|null, "barcode": digits string or null, "confidence": number 0..1, ' +
   '"fieldConfidence": {"title": 0..1, "price": 0..1, "brand": 0..1}}.';
 
 /** Deterministic fallback when no frames are sampled yet or no model is configured. */
@@ -141,7 +143,14 @@ function parseProducts(text: string): ExtractedProduct[] {
         p.fieldConfidence && typeof p.fieldConfidence === 'object'
           ? (p.fieldConfidence as Record<string, number>)
           : {},
+      barcode: parseBarcode(p.barcode),
     }));
+}
+
+/** Accept a vision-read barcode only when it's a plausible product code (6–14 digits). */
+function parseBarcode(v: unknown): string | null {
+  const s = typeof v === 'number' ? String(v) : typeof v === 'string' ? v.trim() : '';
+  return /^\d{6,14}$/.test(s) ? s : null;
 }
 
 /** Strip ```json … ``` fences a model may wrap JSON in. */

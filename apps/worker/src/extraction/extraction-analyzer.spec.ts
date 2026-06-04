@@ -101,6 +101,21 @@ describe('ExtractionAnalyzer', () => {
     const promptText = body.contents[0].parts[0].text as string;
     expect(promptText).toContain('5901234123457');
   });
+
+  it('parses a vision-read barcode (and rejects non-codes)', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      geminiOk(
+        JSON.stringify([
+          { title: 'Faxe Kondi', brand: 'Faxe', barcode: '5741000129654', confidence: 0.9, fieldConfidence: {} },
+          { title: 'No code', barcode: 'not-a-barcode', confidence: 0.8, fieldConfidence: {} },
+        ]),
+      ),
+    ) as unknown as typeof fetch;
+
+    const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
+    expect(out.products.find((p) => p.title === 'Faxe Kondi')?.barcode).toBe('5741000129654');
+    expect(out.products.find((p) => p.title === 'No code')?.barcode).toBeNull();
+  });
 });
 
 describe('enrichProducts (unit)', () => {
