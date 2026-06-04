@@ -1,7 +1,32 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
-/** Create a shipment/fulfillment for an order (manual carrier entry in P1). */
+/**
+ * Create a shipment/fulfillment for an order. Either record a carrier + tracking
+ * manually, or set `buyLabel: true` to purchase a label via Shippo (when
+ * SHIPPO_API_KEY + ship-from/ship-to addresses are present; falls back to manual).
+ */
 export class CreateShipmentDto {
+  /** Purchase a label via Shippo instead of manual carrier entry. */
+  @IsOptional()
+  @IsBoolean()
+  buyLabel?: boolean;
+
+  /** Parcel dimensions for the rate request (cm); sensible defaults applied. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  lengthCm?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  widthCm?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  heightCm?: number;
+
   @IsOptional()
   @IsString()
   @MaxLength(60)

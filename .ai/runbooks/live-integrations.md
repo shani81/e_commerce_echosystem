@@ -68,11 +68,22 @@ the *real* end-to-end.
 The **manual** shipment flow is live today: admin **Orders → Fulfillment** records a carrier +
 tracking, marks the shipment shipped → order FULFILLED + buyer tracking email.
 
-**Auto-label purchase** is gated on `SHIPPO_API_KEY=shippo_test_...` (Shippo Dashboard → API).
-With a key + a ship-from (default `InventoryLocation` address) + the order's shipping address,
-the shipping service can buy a label and populate `trackingNumber`/`trackingUrl`/`labelUrlCached`.
-Without a key it falls back to the manual flow. (Address plumbing + the live Shippo call land in
-the next P2.3 step once a test key is available.)
+**Auto-label purchase** is now implemented (`ShippoService`): set `SHIPPO_API_KEY=shippo_test_...`
+(Shippo Dashboard → API), then `POST /orders/:id/shipments { "buyLabel": true }`. With a key + a
+ship-from (the default `InventoryLocation`'s address) + the order's shipping address, the service
+creates a Shippo shipment, picks the **cheapest rate**, buys the label, and populates
+`carrier`/`trackingNumber`/`trackingUrl`/`labelUrlCached`/`rateAmountCents`. Any failure (no key,
+missing address, API error) **degrades to a manual shipment** so fulfillment is never blocked.
+
+Live-run checklist (needs a test key):
+1. `SHIPPO_API_KEY=shippo_test_...` in `.env`; restart.
+2. Seed a **default** `InventoryLocation` with an `Address` (ship-from).
+3. Ensure the order has a `shippingAddress` (Stripe Checkout collects it — capturing it back onto
+   the order on `checkout.session.completed` is a small follow-up; until then pass addresses or set
+   it manually).
+4. `POST /orders/:id/shipments { "buyLabel": true }` → verify `labelUrlCached` + tracking populated.
+Request shaping is unit-tested (`shippo.service.spec.ts`); verify field shapes against live Shippo
+on first real run.
 
 ---
 
