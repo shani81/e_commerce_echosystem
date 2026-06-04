@@ -61,6 +61,66 @@ function band(c: number): { label: string; variant: BadgeVariant } {
   return { label: 'Low', variant: 'danger' };
 }
 
+/** Per-status progress + a plain-language explanation (shown in the legend). */
+const STATUS_INFO: Record<string, { percent: number; desc: string }> = {
+  QUEUED: { percent: 8, desc: 'Waiting for a worker to pick up the job.' },
+  INGESTING: { percent: 30, desc: 'Sampling frames from the video (ffmpeg).' },
+  ANALYZING: { percent: 60, desc: 'Reading frames — scanning barcodes + AI vision.' },
+  MERGING: { percent: 85, desc: 'Combining & de-duplicating the detected products.' },
+  AWAITING_REVIEW: { percent: 100, desc: 'Done — ready for you to review & accept.' },
+  PUBLISHED: { percent: 100, desc: 'Accepted products were published to the catalog.' },
+  FAILED: { percent: 100, desc: 'Something went wrong while processing the job.' },
+  CANCELLED: { percent: 100, desc: 'The job was cancelled.' },
+};
+const STATUS_ORDER = [
+  'QUEUED',
+  'INGESTING',
+  'ANALYZING',
+  'MERGING',
+  'AWAITING_REVIEW',
+  'PUBLISHED',
+  'FAILED',
+  'CANCELLED',
+];
+/** Statuses still being worked on → drive live polling + a pulsing bar. */
+const PROCESSING = new Set(['QUEUED', 'INGESTING', 'ANALYZING', 'MERGING']);
+
+function ProgressBar({ status }: { status: string }) {
+  const pct = STATUS_INFO[status]?.percent ?? 0;
+  const v = jobStatusVariant(status);
+  const color =
+    v === 'success' ? 'bg-green-500' : v === 'danger' ? 'bg-red-500' : v === 'warning' ? 'bg-amber-500' : 'bg-blue-500';
+  return (
+    <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-neutral-100" title={STATUS_INFO[status]?.desc}>
+      <div
+        className={`h-full rounded-full ${color} transition-all ${PROCESSING.has(status) ? 'animate-pulse' : ''}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+/** Collapsible legend explaining what each job status means. */
+function StatusLegend() {
+  return (
+    <details className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium text-neutral-700">What do the statuses mean?</summary>
+      <ul className="mt-2 space-y-1.5">
+        {STATUS_ORDER.map((s) => (
+          <li key={s} className="flex items-center gap-2">
+            <Badge variant={jobStatusVariant(s)}>{s}</Badge>
+            <span className="text-neutral-600">{STATUS_INFO[s]?.desc}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-neutral-400">
+        A job moves QUEUED → INGESTING → ANALYZING → MERGING → AWAITING_REVIEW. Nothing publishes on
+        its own — you accept results into DRAFT products.
+      </p>
+    </details>
+  );
+}
+
 export default function ExtractionPage() {
   const [list, setList] = React.useState<Paginated<JobSummary> | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -87,6 +147,16 @@ export default function ExtractionPage() {
   React.useEffect(() => {
     load();
   }, [load]);
+
+  // Live-poll while any job is still processing, so the progress bars advance.
+  React.useEffect(() => {
+    const processing = (list?.items ?? []).some((j) => PROCESSING.has(j.status));
+    if (!processing) return;
+    const t = setInterval(() => {
+      load();
+    }, 3000);
+    return () => clearInterval(t);
+  }, [list, load]);
 
   async function startExtraction() {
     if (!mediaId.trim()) return;
@@ -169,6 +239,8 @@ export default function ExtractionPage() {
         description="Film your shelves → AI drafts a catalog → you review &amp; accept. Nothing publishes on its own."
       />
 
+      <StatusLegend />
+
       <Card variant="outline" padding="md">
         <h3 className="mb-2 text-sm font-semibold text-neutral-900">Start a new extraction</h3>
 
@@ -233,6 +305,7 @@ export default function ExtractionPage() {
                 <Td className="font-mono text-xs text-neutral-700">{j.id.slice(0, 10)}…</Td>
                 <Td>
                   <Badge variant={jobStatusVariant(j.status)}>{j.status}</Badge>
+                  <ProgressBar status={j.status} />
                 </Td>
                 <Td className="text-right tabular-nums">{j.framesExtracted}</Td>
                 <Td className="text-right tabular-nums">{j._count?.results ?? j.productsFound}</Td>
@@ -284,6 +357,9 @@ function JobReviewPanel({
 }) {
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [barcode, setBarcode] = React.useState('');
+  const [addingBarcode, setAddingBarcode] = React.useState(false);
+  const [barcodeMsg, setBarcodeMsg] = React.useState<string | null>(null);
 
   async function accept(resultId: string) {
     setBusyId(resultId);
@@ -295,6 +371,35 @@ function JobReviewPanel({
       setError(err instanceof ApiError ? err.message : 'Could not accept this result.');
     } finally {
       setBusyId(null);
+    }
+  }
+
+  // Manual barcode entry — for codes the camera couldn't read (curved cans, blur).
+  async function addByBarcode() {
+    const code = barcode.trim();
+    if (!/^\d{6,14}$/.test(code)) {
+      setError('Enter a numeric barcode (UPC/EAN, 6–14 digits).');
+      return;
+    }
+    setAddingBarcode(true);
+    setError(null);
+    setBarcodeMsg(null);
+    try {
+      const res = await apiPost<{ found: boolean; title: string | null }>(
+        `/extractions/${job.id}/results/barcode`,
+        { barcode: code },
+      );
+      setBarcode('');
+      setBarcodeMsg(
+        res.found
+          ? `Added “${res.title}”.`
+          : `Added ${code} — not in the product database; edit the title after accepting.`,
+      );
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not add that barcode.');
+    } finally {
+      setAddingBarcode(false);
     }
   }
 
@@ -322,6 +427,30 @@ function JobReviewPanel({
           <span className="break-words font-mono text-xs text-amber-700">{job.errorMessage}</span>
         </div>
       ) : null}
+
+      <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+        <Field
+          label="Add a product by barcode"
+          htmlFor="barcode"
+          hint="Type a UPC/EAN the camera couldn't read — we look it up and add it as a draftable product."
+        >
+          <Input
+            id="barcode"
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addByBarcode();
+            }}
+            placeholder="e.g. 5701234567890"
+            inputMode="numeric"
+            className="w-56"
+          />
+        </Field>
+        <Button size="sm" variant="outline" isLoading={addingBarcode} disabled={!barcode.trim()} onClick={addByBarcode}>
+          Look up &amp; add
+        </Button>
+        {barcodeMsg ? <span className="pb-2 text-xs text-neutral-500">{barcodeMsg}</span> : null}
+      </div>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
