@@ -1,0 +1,52 @@
+# AICOS Prometheus alert rules (Phase 2 · P2.4).
+# Load into Prometheus via rule_files; scrape the api `/metrics` (api port) and
+# the worker `/metrics` (worker port). Tune thresholds per environment.
+groups:
+  - name: aicos-queues
+    rules:
+      - alert: QueueBacklogHigh
+        expr: aicos_queue_depth{state="waiting"} > 100
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'BullMQ backlog high on {{ $labels.queue }}'
+          description: '{{ $value }} jobs waiting on the {{ $labels.queue }} queue for 5m.'
+
+      - alert: QueueFailuresHigh
+        expr: aicos_queue_depth{state="failed"} > 50
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: 'BullMQ failures accumulating on {{ $labels.queue }}'
+          description: '{{ $value }} failed jobs on {{ $labels.queue }}.'
+
+  - name: aicos-business
+    rules:
+      - alert: NotificationFailureRateHigh
+        expr: |
+          sum(rate(aicos_notifications_total{status="failed"}[5m]))
+            / clamp_min(sum(rate(aicos_notifications_total[5m])), 1) > 0.1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Transactional email failure rate > 10%'
+          description: 'Check SMTP connectivity / provider status.'
+
+  - name: aicos-api
+    rules:
+      - alert: ApiHighErrorRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_request_duration_seconds_count[5m])), 1) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: 'API 5xx error rate > 5%'
+
+      - alert: ApiLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'API p95 latency > 1s'

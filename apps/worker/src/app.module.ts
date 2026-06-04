@@ -5,8 +5,8 @@ import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { QueuesModule } from './queues/queues.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { HealthController } from './health/health.controller';
-import { MetricsController } from './metrics/metrics.controller';
 
 /**
  * Root module for the worker process.
@@ -59,8 +59,9 @@ import { MetricsController } from './metrics/metrics.controller';
     }),
     PrismaModule,
     RedisModule,
+    MetricsModule,
     QueuesModule,
   ],
-  controllers: [HealthController, MetricsController],
+  controllers: [HealthController],
 })
 export class AppModule {}
