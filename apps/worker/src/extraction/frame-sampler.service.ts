@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { MediaType } from '@aicos/db';
 import ffmpegStatic from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
@@ -58,6 +58,7 @@ const MIN_KEEP = 2; // never blur-prune below this many frames
 export class FrameSamplerService {
   private readonly logger = new Logger(FrameSamplerService.name);
   private readonly s3: S3Client | null;
+  private readonly bucket: string | null;
   private readonly ffmpegPath: string | null;
   private readonly ffprobePath: string | null;
 
@@ -65,6 +66,7 @@ export class FrameSamplerService {
     const endpoint = config.get<string>('S3_ENDPOINT');
     const accessKeyId = config.get<string>('S3_ACCESS_KEY');
     const secretAccessKey = config.get<string>('S3_SECRET_KEY');
+    this.bucket = config.get<string>('S3_BUCKET') ?? null;
     if (endpoint && accessKeyId && secretAccessKey) {
       this.s3 = new S3Client({
         endpoint,
@@ -86,6 +88,30 @@ export class FrameSamplerService {
   /** True when both an object store and an ffmpeg binary are available. */
   get ready(): boolean {
     return this.s3 !== null && this.ffmpegPath !== null;
+  }
+
+  /** The bucket frame thumbnails are uploaded to (null when not configured). */
+  get uploadBucket(): string | null {
+    return this.s3 !== null ? this.bucket : null;
+  }
+
+  /** Upload a frame JPEG to object storage (best-effort). Returns success. */
+  async uploadFrame(key: string, jpeg: Buffer): Promise<boolean> {
+    if (!this.s3 || !this.bucket) return false;
+    try {
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: jpeg,
+          ContentType: 'image/jpeg',
+        }),
+      );
+      return true;
+    } catch (err) {
+      this.logger.warn(`frame upload failed: ${err instanceof Error ? err.message : 'unknown'}`);
+      return false;
+    }
   }
 
   /**

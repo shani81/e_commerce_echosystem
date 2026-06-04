@@ -4,6 +4,8 @@ import type { Job } from 'bullmq';
 import {
   AiProvider,
   ExtractionJobStatus,
+  MediaStatus,
+  MediaType,
   ReviewDecision,
   withTenant,
   type Prisma,
@@ -105,17 +107,48 @@ export class ExtractionProcessor extends WorkerHost {
     );
     const barcodeHints = [...new Set(barcodes.filter((b): b is string => Boolean(b)))];
 
+    // Upload each frame JPEG to object storage (best-effort) so the review UI can
+    // show thumbnails. objectKey per frame, or null when upload is unavailable.
+    const frameBucket = this.sampler.uploadBucket;
+    const frameKeys = await Promise.all(
+      sampled.map(async (f, i) => {
+        if (!usingRealFrames || !frameBucket) return null;
+        const key = `extractions/${claim.jobId}/frame_${String(i).padStart(3, '0')}.jpg`;
+        const ok = await this.sampler.uploadFrame(key, Buffer.from(f.image.base64 ?? '', 'base64'));
+        return ok ? key : null;
+      }),
+    );
+
     // tx2 — persist the frames (real or placeholder) and advance to ANALYZING.
     const frameIds = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const ids: string[] = [];
       if (usingRealFrames) {
         for (let i = 0; i < sampled.length; i++) {
           const f = sampled[i]!;
+          // Link the frame to its uploaded thumbnail (temp/ MediaAsset) when the
+          // upload succeeded; else fall back to the source media reference.
+          let mediaId = claim.media?.id ?? null;
+          const key = frameKeys[i];
+          if (key && frameBucket) {
+            const asset = await tx.mediaAsset.create({
+              data: {
+                tenantId,
+                type: MediaType.IMAGE,
+                status: MediaStatus.READY,
+                bucket: frameBucket,
+                objectKey: key,
+                mimeType: 'image/jpeg',
+                isTemporary: true,
+              },
+              select: { id: true },
+            });
+            mediaId = asset.id;
+          }
           const row = await tx.extractionFrame.create({
             data: {
               tenantId,
               jobId: claim.jobId,
-              mediaId: claim.media?.id ?? null,
+              mediaId,
               frameIndex: f.frameIndex,
               timestampMs: f.timestampMs,
               blurScore: f.blurScore,

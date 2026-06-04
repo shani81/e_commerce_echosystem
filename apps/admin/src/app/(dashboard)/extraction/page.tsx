@@ -34,6 +34,7 @@ interface FrameInfo {
   timestampMs: number | null;
   blurScore: number | null;
   barcode: string | null;
+  thumbnailUrl: string | null;
 }
 interface JobDetail extends JobSummary {
   errorMessage: string | null;
@@ -385,6 +386,7 @@ function JobReviewPanel({
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-neutral-500">
                 <tr>
+                  <th className="py-1.5">Preview</th>
                   <th className="py-1.5">#</th>
                   <th className="py-1.5">Time</th>
                   <th className="py-1.5 text-right">Sharpness</th>
@@ -394,6 +396,17 @@ function JobReviewPanel({
               <tbody className="divide-y divide-neutral-100">
                 {job.frames.map((f) => (
                   <tr key={f.id}>
+                    <td className="py-1.5">
+                      {f.thumbnailUrl ? (
+                        <img
+                          src={f.thumbnailUrl}
+                          alt={`Frame ${f.frameIndex}`}
+                          className="h-14 w-24 rounded border border-neutral-200 object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-neutral-400">—</span>
+                      )}
+                    </td>
                     <td className="py-1.5 text-neutral-700">{f.frameIndex}</td>
                     <td className="py-1.5 tabular-nums text-neutral-600">
                       {f.timestampMs != null ? `${(f.timestampMs / 1000).toFixed(1)}s` : '—'}
