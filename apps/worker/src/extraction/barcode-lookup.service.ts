@@ -68,6 +68,7 @@ export class BarcodeLookupService {
         categoryGuess: lastCategory(json.product?.categories),
         overallConfidence: 0.95, // exact GTIN match
         fieldConfidence: { title: 0.95, brand: 0.9 },
+        barcode: code,
       };
     } catch (err) {
       this.logger.warn(

@@ -30,6 +30,7 @@ describe('BarcodeLookupService', () => {
     expect(p?.categoryGuess).toBe('sodas'); // most-specific, lang prefix stripped
     expect(p?.overallConfidence).toBeGreaterThan(0.9);
     expect(p?.priceCents).toBeNull();
+    expect(p?.barcode).toBe('5449000000996'); // GTIN carried through to the product
   });
 
   it('returns null when the product is not found (status 0)', async () => {
