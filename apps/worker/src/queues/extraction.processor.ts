@@ -25,6 +25,7 @@ import {
 import { FrameSamplerService, type SourceMedia } from '../extraction/frame-sampler.service';
 import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
 import { BarcodeScannerService } from '../extraction/barcode-scanner.service';
+import { BarcodeFinderService } from '../extraction/barcode-finder.service';
 import { BarcodeLookupService } from '../extraction/barcode-lookup.service';
 
 /**
@@ -52,6 +53,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly sampler: FrameSamplerService,
     private readonly semanticDeduper: SemanticDeduperService,
     private readonly barcodeScanner: BarcodeScannerService,
+    private readonly barcodeFinder: BarcodeFinderService,
     private readonly barcodeLookup: BarcodeLookupService,
   ) {
     super();
@@ -192,16 +194,23 @@ export class ExtractionProcessor extends WorkerHost {
     // `analysis.live` is the authoritative "real AI ran" flag; `note` carries
     // the fallback reason (e.g. quota/HTTP error) for the review UI.
     const images: AiImage[] = sampled.map((f) => f.image);
-    const analysis = await this.analyzer.analyze(images, barcodeHints);
+
+    // Agent 1 — a dedicated AI pass that reads ONLY the barcode digits (more
+    // reliable than the general extractor reading them incidentally). Combined
+    // with ZXing, these seed the GTIN lookups + hint the general extractor.
+    const aiBarcodes = await this.barcodeFinder.find(images);
+    const seedBarcodes = [...new Set([...barcodeHints, ...aiBarcodes])];
+
+    const analysis = await this.analyzer.analyze(images, seedBarcodes);
     const visionProducts = analysis.live ? analysis.products : [];
 
-    // The GTIN is authoritative: look up EVERY barcode we have — decoded by ZXing
-    // AND read by the vision model — and let the lookup OVERRIDE the model's
-    // guessed name/brand (and supply the product image). This fixes "right
+    // The GTIN is authoritative: look up EVERY barcode we have — the AI finder,
+    // ZXing, AND any the general extractor read — and let the lookup OVERRIDE the
+    // model's guessed name/brand (and supply the product image). Fixes "right
     // barcode, wrong product name".
     const allBarcodes = [
       ...new Set([
-        ...barcodeHints,
+        ...seedBarcodes,
         ...visionProducts.map((p) => p.barcode).filter((b): b is string => Boolean(b)),
       ]),
     ];
