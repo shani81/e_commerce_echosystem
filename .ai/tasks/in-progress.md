@@ -7,7 +7,7 @@
 
 | Milestone | Status | Notes |
 |-----------|--------|-------|
-| **P2.1** Test suite + CI gating | 🟨 In progress | First batch: critical pure logic extracted to testable units (RBAC match, platform-fee math, CSV import parsing) + Jest specs; `reflect-metadata` setup so DTO specs run. **35 tests / 5 suites green.** Next: service-level + worker tests, DB-integration tests, CI gate on `pnpm test`. |
+| **P2.1** Test suite + CI gating | ✅ Done | Jest suites across: pure logic (RBAC match, platform-fee math, CSV parsing, pagination), **services** (shipping, returns, orders, gdpr — mocked Prisma/Stripe/Notifications), **worker processors** (notifications, dsar — `@aicos/db` `withTenant` mocked) + email templates; plus the pre-existing roles.guard spec and the db RLS isolation (Vitest). **67 tests / 12 suites green** (api 52 / worker 15). CI **already gates `pnpm test`** (Postgres+Redis + RLS) on every PR. Enhancement (non-blocking): promote the contract smokes to in-runner DB-integration tests (they already provide integration coverage as scripts). |
 | **P2.2** Auth/session security | 🟦 Planned | httpOnly-cookie sessions + refresh rotation, rate limiting, remove JWT-in-localStorage. |
 | **P2.3** Live integrations | 🟦 Planned | Stripe test-mode e2e (`stripe listen`), Shippo auto-label, real SMTP + runbooks. |
 | **P2.4** Perf + observability | 🟦 Planned | k6 load tests, BullMQ queue-depth + business metrics, dashboards/alerts, DB index review. |
