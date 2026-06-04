@@ -6,6 +6,7 @@ export * from './types';
 export * from './provider';
 export * from './aliases';
 export * from './router';
+export * from './clip';
 
 export { AnthropicProvider } from './providers/anthropic';
 export type { AnthropicProviderConfig } from './providers/anthropic';

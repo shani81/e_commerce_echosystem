@@ -142,6 +142,34 @@ itself is the only step that needs your key.
 
 ---
 
+## 5. CLIP — semantic frame dedup (OPTIONAL, gated)
+
+Above the pixel-level dHash dedup, the worker can drop **semantically** near-duplicate
+frames (the same shelf shot from a slightly different angle/lighting) using CLIP image
+embeddings. Like Gemini vision, the model lives behind a configured endpoint; without one
+this is **disabled** and the pipeline uses dHash only — no native/model dependency ships.
+
+### Turn it on
+
+1. Stand up a CLIP inference server (any backend) that implements this contract:
+   - **Request:** `POST {CLIP_EMBED_URL}` — `{ "model": "clip", "images": [{ "mimeType": "image/jpeg", "data": "<base64>" }] }`
+   - **Response:** `{ "embeddings": number[][] }` — one vector per input image.
+   (A tiny FastAPI/transformers or `open_clip` server, or a hosted service, works.)
+2. Set in `.env` (already in `turbo.json` `globalEnv` + `.env.example`):
+   - `CLIP_EMBED_URL=https://your-clip-server/embed`
+   - `CLIP_API_KEY=...` (optional bearer)
+   - `CLIP_DEDUP_THRESHOLD=0.92` (cosine ≥ this → same shot; lower = more aggressive)
+3. `pnpm dev`. On each extraction the worker embeds the sampled frames and drops near-
+   duplicates before the vision call — logged as `semantic dedup: N → M frames (CLIP)`.
+
+### Graceful fallback
+
+No `CLIP_EMBED_URL`, an endpoint error, or a vector/frame count mismatch → the frames pass
+through unchanged (pixel dHash dedup still applies). The `SemanticDeduperService` never
+throws and never returns an empty set, so extraction never regresses.
+
+---
+
 ## Security note
 Keep real keys out of git — they live in `.env` (gitignored) or a secrets manager (Doppler, P2.5).
 `.env.example` documents the variable names only.

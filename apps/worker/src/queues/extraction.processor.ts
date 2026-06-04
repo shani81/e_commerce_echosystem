@@ -17,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 import { FrameSamplerService, type SourceMedia } from '../extraction/frame-sampler.service';
+import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
 
 /**
  * Consumer for the `extraction` queue — the flagship AI product-extraction
@@ -41,6 +42,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly analyzer: ExtractionAnalyzer,
     private readonly sampler: FrameSamplerService,
+    private readonly semanticDeduper: SemanticDeduperService,
   ) {
     super();
   }
@@ -86,10 +88,12 @@ export class ExtractionProcessor extends WorkerHost {
 
     // Sample real frames OUTSIDE any tx (S3 download + ffmpeg are slow and must
     // not hold the RLS-scoped transaction open). Empty result → no media, sampler
-    // unavailable, or a decode error → deterministic-mock fallback below.
-    const sampled = claim.media
+    // unavailable, or a decode error → deterministic-mock fallback below. Then an
+    // optional CLIP semantic-dedup pass (gated; no-op when not configured).
+    const sampledRaw = claim.media
       ? await this.sampler.sample(claim.media, ExtractionProcessor.FRAME_COUNT)
       : [];
+    const sampled = await this.semanticDeduper.dedupe(sampledRaw);
     const usingRealFrames = sampled.length > 0;
 
     // tx2 — persist the frames (real or placeholder) and advance to ANALYZING.
