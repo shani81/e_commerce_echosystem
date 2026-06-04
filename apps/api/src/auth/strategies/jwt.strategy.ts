@@ -1,10 +1,16 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ExtractJwt, Strategy, type JwtFromRequestFunction } from 'passport-jwt';
+import type { Request } from 'express';
 import { MembershipStatus } from '@aicos/db';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ACCESS_COOKIE } from '../auth-cookies';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+
+/** Read the access token from the httpOnly cookie first, then the Bearer header. */
+const fromCookie: JwtFromRequestFunction = (req: Request & { cookies?: Record<string, string> }) =>
+  req?.cookies?.[ACCESS_COOKIE] ?? null;
 
 /** Claims embedded in the signed access token. */
 export interface AccessTokenPayload {
@@ -29,7 +35,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly prisma: PrismaService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // Browsers send the httpOnly cookie; programmatic clients (tests, curl,
+      // the worker) keep using the Authorization header.
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        fromCookie,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       // Verify with the RS256 PUBLIC key, and PIN the algorithm so an attacker
       // can't downgrade to HS256 and forge tokens using the public key as the

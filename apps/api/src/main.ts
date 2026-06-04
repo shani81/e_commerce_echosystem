@@ -5,6 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -32,13 +33,20 @@ async function bootstrap(): Promise<void> {
 
   // --- Security ------------------------------------------------------------
   app.use(helmet());
+  // Parse cookies so the JWT strategy + CSRF guard can read the httpOnly session
+  // cookies (P2.2). Programmatic clients still use the Authorization header.
+  app.use(cookieParser());
 
   // --- CORS ----------------------------------------------------------------
+  // Credentialed (cookie) auth requires explicit origins — a wildcard origin is
+  // rejected by browsers when `credentials: true`. Lock down to the configured
+  // web/admin origins (CORS_ORIGINS); `*` reflects the request origin (dev only).
   const corsOrigins = config.get<boolean | string[]>('http.corsOrigins') ?? true;
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Tenant-Id'],
   });
 
   // --- Global validation ---------------------------------------------------

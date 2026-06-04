@@ -1,24 +1,12 @@
 // Browser API client for the admin console. Talks to the NestJS API under
-// /api/v1, attaches the bearer token, and normalises the error envelope the
-// API's HttpExceptionFilter returns ({ statusCode, error, message, ... }).
+// /api/v1 using the httpOnly cookie session (P2.2) — no tokens in JS/localStorage.
 //
-// NOTE (security follow-up): the access token is kept in localStorage for the
-// Phase 1 dev console. The risk register flags JWT-in-localStorage; before
-// production this moves to an httpOnly-cookie session with silent refresh.
+// Cookies (access/refresh) are sent automatically via `credentials: 'include'`;
+// the non-httpOnly CSRF cookie is echoed in the `X-CSRF-Token` header
+// (double-submit). On a 401 we attempt one silent refresh, then retry once.
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 export const API_BASE = `${API_URL}/api/v1`;
-const TOKEN_KEY = 'aicos.admin.token';
-
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(TOKEN_KEY);
-}
-export function setToken(token: string | null): void {
-  if (typeof window === 'undefined') return;
-  if (token) window.localStorage.setItem(TOKEN_KEY, token);
-  else window.localStorage.removeItem(TOKEN_KEY);
-}
 
 export class ApiError extends Error {
   constructor(
@@ -31,6 +19,13 @@ export class ApiError extends Error {
   }
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = document.cookie.match(new RegExp('(?:^|; )' + escaped + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]!) : null;
+}
+
 function messageFrom(data: unknown, status: number): string {
   if (data && typeof data === 'object' && 'message' in data) {
     const m = (data as { message: unknown }).message;
@@ -40,30 +35,56 @@ function messageFrom(data: unknown, status: number): string {
   return `Request failed (${status})`;
 }
 
-export async function api<T = unknown>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}${path}`, {
+function rawFetch(method: string, path: string, body?: unknown): Promise<Response> {
+  const csrf = readCookie('aicos_csrf');
+  return fetch(`${API_BASE}${path}`, {
     method,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+}
+
+// Don't trigger a silent refresh for the auth endpoints themselves (avoids loops).
+const NO_REFRESH = new Set(['/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout']);
+
+// Single-flight refresh so concurrent 401s share one /auth/refresh call.
+let refreshPromise: Promise<boolean> | null = null;
+function silentRefresh(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = rawFetch('POST', '/auth/refresh')
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+export async function api<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+  const basePath = path.split('?')[0]!;
+  let res = await rawFetch(method, path, body);
+
+  if (res.status === 401 && !NO_REFRESH.has(basePath)) {
+    if (await silentRefresh()) {
+      res = await rawFetch(method, path, body);
+    }
+  }
 
   if (res.status === 204) return undefined as T;
   const data: unknown = await res.json().catch(() => null);
 
   if (!res.ok) {
-    if (res.status === 401 && typeof window !== 'undefined') {
-      setToken(null);
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
-      }
+    if (
+      res.status === 401 &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      window.location.href = '/login';
     }
     throw new ApiError(res.status, messageFrom(data, res.status), data);
   }
