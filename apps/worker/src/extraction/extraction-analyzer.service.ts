@@ -55,6 +55,7 @@ export class ExtractionAnalyzer {
     this.hasModelKey = Boolean(geminiApiKey);
     this.router = createDefaultRouter({
       geminiApiKey,
+      geminiModel: config.get<string>('GEMINI_MODEL'),
       anthropicApiKey: config.get<string>('ANTHROPIC_API_KEY'),
       openaiApiKey: config.get<string>('OPENAI_API_KEY'),
     });

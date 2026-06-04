@@ -30,11 +30,13 @@ export function createDefaultRouter(
     anthropicApiKey?: string;
     openaiApiKey?: string;
     geminiApiKey?: string;
+    /** Override the Gemini model id (e.g. `gemini-flash-latest`). */
+    geminiModel?: string;
   } = {},
 ): AiRouter {
-  const { anthropicApiKey, openaiApiKey, geminiApiKey, ...routerOptions } = options;
+  const { anthropicApiKey, openaiApiKey, geminiApiKey, geminiModel, ...routerOptions } = options;
   return new AiRouter(routerOptions)
-    .register(new GeminiProvider({ apiKey: geminiApiKey }))
+    .register(new GeminiProvider({ apiKey: geminiApiKey, model: geminiModel }))
     .register(new AnthropicProvider({ apiKey: anthropicApiKey }))
     .register(new OpenAiProvider({ apiKey: openaiApiKey }));
 }
