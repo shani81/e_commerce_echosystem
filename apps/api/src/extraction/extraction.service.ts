@@ -21,6 +21,7 @@ import {
 } from '@aicos/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../media/s3.service';
+import { lookupBarcodeProduct } from './barcode-lookup.util';
 import type { PaginatedResult, PaginationDto } from '../common/dto/pagination.dto';
 import type { CreateExtractionDto } from './dto/create-extraction.dto';
 
@@ -156,6 +157,46 @@ export class ExtractionService {
     });
     this.logger.log(`extraction job ${id} deleted`);
     return { id, deleted: true };
+  }
+
+  /**
+   * Manually add a product to a job by barcode — for when auto-detection can't
+   * read a code (curved cans, blur, angle). Resolves the GTIN against the open
+   * product databases; an unknown code still creates a draftable placeholder.
+   */
+  async addBarcodeResult(tenantId: string, jobId: string, barcode: string) {
+    const code = barcode.trim();
+    const job = await this.prisma.forTenant(tenantId, (tx) =>
+      tx.extractionJob.findFirst({ where: { id: jobId, tenantId }, select: { id: true } }),
+    );
+    if (!job) throw new NotFoundException('Extraction job not found');
+
+    const looked = await lookupBarcodeProduct(code);
+    const result = await this.prisma.forTenant(tenantId, async (tx) => {
+      const r = await tx.extractionResult.create({
+        data: {
+          tenantId,
+          jobId,
+          title: looked?.title ?? `Product ${code}`,
+          barcode: code,
+          currency: 'USD',
+          brandGuess: looked?.brand ?? null,
+          categoryGuess: looked?.category ?? null,
+          overallConfidence: looked ? 0.95 : 0.5,
+          fieldConfidence: { title: looked ? 0.95 : 0.3 } as Prisma.InputJsonValue,
+          sourceFrameIds: [] as Prisma.InputJsonValue,
+          imageMediaIds: [] as Prisma.InputJsonValue,
+        },
+        select: { id: true },
+      });
+      await tx.extractionReviewItem.create({
+        data: { tenantId, jobId, resultId: r.id, decision: ReviewDecision.PENDING },
+      });
+      return r;
+    });
+
+    this.logger.log(`extraction ${jobId}: manual barcode ${code} → result ${result.id} (found=${Boolean(looked)})`);
+    return { id: result.id, found: Boolean(looked), title: looked?.title ?? null };
   }
 
   /** Human gate: accept an extracted result → create a DRAFT product for it. */

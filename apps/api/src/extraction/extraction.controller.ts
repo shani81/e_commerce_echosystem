@@ -18,6 +18,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import type { AuthenticatedUser } from '../common/types/authenticated-user';
 import { ExtractionService } from './extraction.service';
 import { CreateExtractionDto } from './dto/create-extraction.dto';
+import { AddBarcodeDto } from './dto/add-barcode.dto';
 
 /**
  * AI product-extraction (→ `/api/v1/extractions`). Tenant-scoped + RBAC. Start a
@@ -51,6 +52,16 @@ export class ExtractionController {
   @Permissions(PERMISSIONS.EXTRACTION_WRITE)
   remove(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.extraction.remove(tenantId, id);
+  }
+
+  @Post(':id/results/barcode')
+  @Permissions(PERMISSIONS.EXTRACTION_WRITE)
+  addBarcode(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: AddBarcodeDto,
+  ) {
+    return this.extraction.addBarcodeResult(tenantId, id, dto.barcode);
   }
 
   @Post('results/:resultId/accept')
