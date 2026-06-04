@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -9,7 +9,7 @@ import * as nodemailer from 'nodemailer';
  * notification pipeline still completes (status SENT) without a mail server.
  */
 @Injectable()
-export class MailService {
+export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
   private readonly transporter: nodemailer.Transporter | null;
   private readonly from: string;
@@ -32,6 +32,19 @@ export class MailService {
       ...(user ? { auth: { user, pass } } : {}),
     });
     this.logger.log(`SMTP mailer ready (${host}:${port})`);
+  }
+
+  /** Verify SMTP connectivity at boot (best-effort) so misconfig surfaces early. */
+  async onModuleInit(): Promise<void> {
+    if (!this.transporter) return;
+    try {
+      await this.transporter.verify();
+      this.logger.log('SMTP connection verified');
+    } catch (err) {
+      this.logger.warn(
+        `SMTP verify failed — emails may not deliver: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
+    }
   }
 
   get enabled(): boolean {
