@@ -9,6 +9,7 @@ import { QueueMetricsService } from './queue-metrics.service';
 import { MailService } from '../mail/mail.service';
 import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 import { FrameSamplerService } from '../extraction/frame-sampler.service';
+import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
 import { MetricsModule } from '../metrics/metrics.module';
 
 /**
@@ -39,6 +40,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     MailService,
     ExtractionAnalyzer,
     FrameSamplerService,
+    SemanticDeduperService,
   ],
 })
 export class QueuesModule {}
