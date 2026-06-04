@@ -79,9 +79,10 @@ missing address, API error) **degrades to a manual shipment** so fulfillment is 
 Live-run checklist (needs a test key):
 1. `SHIPPO_API_KEY=shippo_test_...` in `.env`; restart.
 2. Seed a **default** `InventoryLocation` with an `Address` (ship-from).
-3. Ensure the order has a `shippingAddress` (Stripe Checkout collects it — capturing it back onto
-   the order on `checkout.session.completed` is a small follow-up; until then pass addresses or set
-   it manually).
+3. The order's `shippingAddress` is captured **automatically**: Checkout collects it
+   (`shipping_address_collection`, countries via `CHECKOUT_SHIPPING_COUNTRIES`) and the
+   `checkout.session.completed` webhook persists it (plus a billing snapshot + buyer email) onto
+   the order in the shape `ShippingService.toAddress()` reads.
 4. `POST /orders/:id/shipments { "buyLabel": true }` → verify `labelUrlCached` + tracking populated.
 Request shaping is unit-tested (`shippo.service.spec.ts`); verify field shapes against live Shippo
 on first real run.
