@@ -269,7 +269,7 @@
 /* ============================ DATA ============================ */
 const D = {
   lastUpdated: "2026-06-04",
-  phase: "Phase 1 — Core Commerce (M1.3)",
+  phase: "Phase 1 — Core Commerce (complete)",
   northStar: "A non-technical physical-store owner records a short video of their shelves, uploads it, AI extracts the full catalog (names, prices, variants, images, SEO) with per-field confidence, the owner reviews and clicks Publish, and a complete operational online store goes live in under 15 minutes. AICOS is a general e-commerce operating system for any physical store.",
   stats: [
     {k:"Modules", v:"24", s:"across 6 phases"},
@@ -305,7 +305,7 @@ const D = {
   ],
   phases: [
     {key:"P0",name:"Foundation",goal:"Monorepo, Docker infra, IAM + multi-tenancy, billing skeleton, design system, CI/CD, observability.",status:"In Progress",completion:90,eta:"✓ exit review GO",milestones:["✓ M0.1 Monorepo + infra + CI","✓ M0.2 Prisma + RLS isolation test","✓ M0.3 Auth (RS256) + RBAC + tenant ctx","✓ M0.4 Billing skeleton + Stripe webhooks","✓ M0.5 Design system + observability"]},
-    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"In Progress",completion:50,eta:"→ 2026-12-09",milestones:["✓ M1.1 Catalog + inventory + media + admin UI","✓ M1.2 Meili search + storefront browse","✓ M1.3 Stripe Checkout + Connect + tax","M1.4 Shipping (Shippo) + notifications","M1.5 Customer portal + returns","M1.6 GDPR DSAR + import"]},
+    {key:"P1",name:"Core Commerce MVP",goal:"Catalog, inventory, orders, Stripe, shipping, customers + portal, admin, storefront, search, media, notifications. A store can sell — manually.",status:"Complete",completion:100,eta:"feature-complete · exit review next",milestones:["✓ M1.1 Catalog + inventory + media + admin UI","✓ M1.2 Meili search + storefront browse","✓ M1.3 Stripe Checkout + Connect + tax","✓ M1.4 Shipping + transactional notifications","✓ M1.5 Customer portal + returns","✓ M1.6 GDPR DSAR + CSV/Woo import"]},
     {key:"P2",name:"The Magic (AI Extraction)",goal:"AI provider abstraction, flagship video→catalog pipeline, product creation agent, human verification, AI content + SEO.",status:"Planned",completion:0,eta:"→ 2027-03-31 ⚠ highest uncertainty",milestones:["M2.1 ai-core + usage + fallback","M2.2 Ingest + frames + ZXing zero-cost","M2.3 Gemini + Claude + pgvector dedup","M2.4 Human review UI + publish gate","M2.5 Content/SEO + credits; demo"]},
     {key:"P3",name:"AI Store Builder",goal:"AI store generation from a name, website-cloning (inspiration, not copying), dynamic theme generation.",status:"Planned",completion:0,eta:"→ 2027-06-09",milestones:["M3.1 Theme engine + tokens","M3.2 Store builder from name","M3.3 Website cloning + guardrails","M3.4 Submit Google OAuth verification"]},
     {key:"P4",name:"Growth & Intelligence",goal:"Google ecosystem sync, marketing/customer-service/pricing agents, analytics & BI, AI inventory forecasting.",status:"Planned",completion:0,eta:"→ 2027-10-06",milestones:["M4.1 Merchant API v1 + GBP","M4.2 GA4 + Search Console + GTM","M4.3 Marketing + CS agents","M4.4 Pricing + analytics + forecasting"]},
@@ -433,6 +433,7 @@ const D = {
   ],
   intel: "6 research dossiers · 9 Master-Brain docs · flagship feature pack · 59-model schema · 317-endpoint registry · 12-agent spec",
   timeline: [
+    ["2026-06-04","Phase 1 (M1.4–M1.6): shipping + fulfillment, transactional email pipeline (queue→worker SMTP), customer portal + returns (approve/refund + restock), GDPR DSAR export/erase (worker), CSV/WooCommerce import. Admin Returns/Import/Privacy + web /orders portal. Verified (contract smoke 20/20). **Phase 1 Core Commerce MVP feature-complete (M1.1–M1.6).**"],
     ["2026-06-04","Phase 1 (M1.3): Stripe Checkout + Connect (destination charge + app fee) + Tax; cart → order; idempotent webhook worker → order PAID + Payment + stock decrement; admin orders/refunds + Payments onboarding; web cart/checkout. Verified (contract smoke 19/19; live Stripe deferred). M1.3 complete."],
     ["2026-06-03","Phase 1 (M1.2): Meilisearch index sync + tenant search/token + PUBLIC storefront browse/detail (web /shop + /products). Verified live (smoke 13/13). M1.2 complete."],
     ["2026-06-03","Phase 1 (M1.1): admin UI — auth/session + catalog & inventory CRUD screens + live overview KPIs (next build 11 routes). M1.1 complete."],

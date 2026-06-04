@@ -364,6 +364,8 @@ function OrderDetailPanel({
         </div>
       ) : null}
 
+      <ShipmentsSection orderId={order.id} />
+
       {error ? (
         <p role="alert" className="mt-3 text-sm font-medium text-danger">
           {error}
@@ -378,6 +380,113 @@ function OrderDetailPanel({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+interface Shipment {
+  id: string;
+  status: string;
+  carrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: string | null;
+}
+
+/** Fulfillment: list shipments, add one (manual carrier/tracking), mark shipped. */
+function ShipmentsSection({ orderId }: { orderId: string }) {
+  const [shipments, setShipments] = React.useState<Shipment[]>([]);
+  const [carrier, setCarrier] = React.useState('');
+  const [tracking, setTracking] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    try {
+      setShipments(await apiGet<Shipment[]>(`/orders/${orderId}/shipments`));
+    } catch {
+      /* ignore */
+    }
+  }, [orderId]);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  async function create() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiPost(`/orders/${orderId}/shipments`, {
+        carrier: carrier.trim() || undefined,
+        trackingNumber: tracking.trim() || undefined,
+      });
+      setCarrier('');
+      setTracking('');
+      await load();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not create shipment.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function ship(id: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiPost(`/shipments/${id}/ship`, {});
+      await load();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not mark shipped.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-5 border-t border-neutral-100 pt-4">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Fulfillment</h4>
+
+      {shipments.length > 0 ? (
+        <ul className="mb-3 space-y-1.5 text-sm">
+          {shipments.map((s) => (
+            <li key={s.id} className="flex flex-wrap items-center gap-2">
+              <Badge variant={statusVariant(s.status)}>{s.status}</Badge>
+              <span className="text-neutral-700">{s.carrier ?? 'Shipment'}</span>
+              {s.trackingNumber ? (
+                <span className="font-mono text-xs text-neutral-500">{s.trackingNumber}</span>
+              ) : null}
+              {!['IN_TRANSIT', 'DELIVERED'].includes(s.status) ? (
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => ship(s.id)}>
+                  Mark shipped
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-3 text-sm text-neutral-400">No shipments yet.</p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={carrier}
+          onChange={(e) => setCarrier(e.target.value)}
+          placeholder="Carrier (e.g. USPS)"
+          className="h-8 w-36 rounded-md border border-neutral-300 px-2 text-sm"
+        />
+        <input
+          value={tracking}
+          onChange={(e) => setTracking(e.target.value)}
+          placeholder="Tracking number"
+          className="h-8 w-44 rounded-md border border-neutral-300 px-2 text-sm"
+        />
+        <Button size="sm" isLoading={busy} onClick={create}>
+          Add shipment
+        </Button>
+      </div>
+      {err ? <p className="mt-2 text-sm text-danger">{err}</p> : null}
+    </div>
   );
 }
 

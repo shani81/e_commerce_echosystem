@@ -10,6 +10,10 @@ export const QUEUE_NAMES = {
   extraction: 'extraction',
   /** Billing side-effects, primarily Stripe webhook fan-out. */
   billing: 'billing',
+  /** Transactional notifications (email via SMTP), one job per Notification row. */
+  notifications: 'notifications',
+  /** GDPR DSAR processing (export / erasure), 30-day SLA. */
+  dsar: 'dsar',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -43,6 +47,18 @@ export const BILLING_JOBS = {
   stripeEvent: 'stripe.event',
 } as const;
 
+/** Job names handled on the `notifications` queue. */
+export const NOTIFICATION_JOBS = {
+  /** Send one persisted Notification row (render template → SMTP). */
+  send: 'notification.send',
+} as const;
+
+/** Job names handled on the `dsar` queue. */
+export const DSAR_JOBS = {
+  /** Process a GDPR DsarRequest (export bundle or erasure). */
+  process: 'dsar.process',
+} as const;
+
 /** Payload for an `extraction.run` job. */
 export interface ExtractionJobData {
   /** Owning tenant — every pipeline side-effect must be tenant-scoped. */
@@ -53,6 +69,22 @@ export interface ExtractionJobData {
   s3ETag: string;
   /** Video segment / photo-batch index being processed (0 for whole-asset). */
   segmentIndex?: number;
+}
+
+/** Payload for a `notification.send` job — the Notification row to render+send. */
+export interface NotificationJobData {
+  /** Owning tenant (RLS scope). */
+  tenantId: string;
+  /** The persisted Notification row id to load, render and send. */
+  notificationId: string;
+}
+
+/** Payload for a `dsar.process` job — the GDPR request to fulfil. */
+export interface DsarJobData {
+  /** Owning tenant (RLS scope). */
+  tenantId: string;
+  /** The DsarRequest row id (EXPORT or ERASURE). */
+  dsarRequestId: string;
 }
 
 /** Payload for a `stripe.event` job. */

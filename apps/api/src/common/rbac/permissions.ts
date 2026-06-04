@@ -23,6 +23,13 @@ export const PERMISSIONS = {
   PAYMENT_WRITE: 'payment:write',
   CUSTOMER_READ: 'customer:read',
   CUSTOMER_WRITE: 'customer:write',
+  SHIPPING_READ: 'shipping:read',
+  SHIPPING_WRITE: 'shipping:write',
+  RETURN_READ: 'return:read',
+  RETURN_WRITE: 'return:write',
+  GDPR_READ: 'gdpr:read',
+  GDPR_WRITE: 'gdpr:write',
+  IMPORT_WRITE: 'import:write',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -54,6 +61,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.PAYMENT_WRITE,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_WRITE,
+    PERMISSIONS.SHIPPING_READ,
+    PERMISSIONS.SHIPPING_WRITE,
+    PERMISSIONS.RETURN_READ,
+    PERMISSIONS.RETURN_WRITE,
+    PERMISSIONS.GDPR_READ,
+    PERMISSIONS.GDPR_WRITE,
+    PERMISSIONS.IMPORT_WRITE,
   ],
   [RoleType.STORE_STAFF]: [
     PERMISSIONS.USER_READ,
@@ -63,6 +77,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.MEDIA_READ,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.CUSTOMER_READ,
+    PERMISSIONS.SHIPPING_READ,
+    PERMISSIONS.SHIPPING_WRITE,
+    PERMISSIONS.RETURN_READ,
   ],
 };
 

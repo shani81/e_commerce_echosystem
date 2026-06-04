@@ -24,6 +24,11 @@ import { CartModule } from './cart/cart.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { ConnectModule } from './connect/connect.module';
 import { OrdersModule } from './orders/orders.module';
+import { ShippingModule } from './shipping/shipping.module';
+import { ReturnsModule } from './returns/returns.module';
+import { PortalModule } from './portal/portal.module';
+import { GdprModule } from './gdpr/gdpr.module';
+import { ImportModule } from './import/import.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -92,6 +97,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     CheckoutModule,
     ConnectModule,
     OrdersModule,
+    ShippingModule,
+    ReturnsModule,
+    PortalModule,
+    GdprModule,
+    ImportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

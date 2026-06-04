@@ -74,6 +74,12 @@ export default function ShopPage() {
               />
             </form>
             <Link
+              href="/orders"
+              className="hidden h-10 shrink-0 items-center px-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 sm:inline-flex"
+            >
+              Orders
+            </Link>
+            <Link
               href="/cart"
               className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
