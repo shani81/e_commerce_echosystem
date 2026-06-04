@@ -30,6 +30,8 @@ export const PERMISSIONS = {
   GDPR_READ: 'gdpr:read',
   GDPR_WRITE: 'gdpr:write',
   IMPORT_WRITE: 'import:write',
+  EXTRACTION_READ: 'extraction:read',
+  EXTRACTION_WRITE: 'extraction:write',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

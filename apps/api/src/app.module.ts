@@ -30,6 +30,7 @@ import { ReturnsModule } from './returns/returns.module';
 import { PortalModule } from './portal/portal.module';
 import { GdprModule } from './gdpr/gdpr.module';
 import { ImportModule } from './import/import.module';
+import { ExtractionModule } from './extraction/extraction.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -109,6 +110,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     PortalModule,
     GdprModule,
     ImportModule,
+    ExtractionModule,
   ],
   providers: [
     // Guard order matters: rate-limit first, then CSRF (cookie sessions), then

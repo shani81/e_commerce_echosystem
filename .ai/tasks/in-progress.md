@@ -1,6 +1,6 @@
 # AICOS — In Progress
 
-> **PHASE 2 — Production-Hardening (in progress).** Phase 1 Core Commerce MVP is feature-complete (M1.1–M1.6, exit review 🟢 GO, tagged `v0.1.0-mvp`). Trunk: `main`. Current work: branch `feat/p2.1-test-suite`.
+> **PHASE 2 — Production-Hardening (wrapping up) + AI-extraction flagship (kicked off).** Phase 1 Core Commerce MVP feature-complete (M1.1–M1.6, exit review 🟢 GO, tagged `v0.1.0-mvp`). Trunk: `main`.
 > Last updated: 2026-06-04.
 
 ## Phase 2 — Production-Hardening milestones
@@ -11,7 +11,14 @@
 | **P2.2** Auth/session security | ✅ Done | **httpOnly cookie sessions** (access+refresh) — JwtStrategy reads cookie→Bearer fallback; login/refresh/logout set/rotate/clear cookies. **CSRF** double-submit guard (cookie sessions only; Bearer skipped). **Rate limiting** (`@nestjs/throttler` 200/min global, 10/min auth). **CORS** locked to explicit origins. Admin app: cookie creds + **silent refresh** + CSRF header, **no more localStorage token**. Verified — auth smoke 8/8 (cookie auth, CSRF 403→201, Bearer fallback, refresh rotation, 429) + csrf.guard spec. 72 unit tests, gates green. (Existing refresh **rotation/revocation** machinery reused.) |
 | **P2.3** Live integrations | 🟨 In progress | **Email LIVE** — worker delivers real SMTP mail (Mailhog); `MailService` verifies SMTP on boot; live smoke 5/5 (order-paid → confirmation email physically in Mailhog, real providerMessageId). **Runbook** `.ai/runbooks/live-integrations.md` (Stripe + Shippo + SMTP). Pending **test keys** (user): Stripe e2e via `stripe listen`; Shippo auto-label. |
 | **P2.4** Perf + observability | ✅ Done | Worker **MetricsService** + `QueueMetricsService` (10s poll) → `aicos_queue_depth{queue,state}` gauges + business counters (`orders_paid_total`, `notifications_total{status}`, `dsar_processed_total{type}`) wired into the processors; verified live on worker `/metrics` (real Redis counts). **k6** load script (`perf/k6/storefront.js`), **Prometheus alerts** (`ops/prometheus/alerts.yml`), observability + **DB index review** runbook. Gates green; 72 unit tests. |
-| **P2.5** Ops / CD | 🟦 Planned | App Dockerfiles, CI build+test gating, Doppler secrets. |
+| **P2.5** Ops / CD | ✅ Done (backend) | Multi-stage **Dockerfiles** for api + worker (pnpm monorepo; prisma generate on alpine); `.dockerignore`; `docker/docker-compose.apps.yml` (apps on the infra network); **CI `docker` job** builds both images; `.ai/runbooks/deployment.md` (Doppler secrets, KEDA autoscale on `aicos_queue_depth`). Worker image built locally (exit 0). Follow-up: web/admin Next `standalone` images + `pnpm deploy`/distroless slimming. |
+
+## AI-extraction flagship — kicked off (feature track)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Extraction loop (vertical slice) | ✅ Kicked off | API `ExtractionModule` (`/extractions` create/list/get + **accept→DRAFT product** human gate, RBAC `extraction:*`); worker pipeline shape `QUEUED→INGESTING→ANALYZING→MERGING→AWAITING_REVIEW` persisting Frame/Result/ReviewItem; **mock analyzer** (3 products, per-field confidence) is the single swap-point for live AI. Verified — kickoff smoke 9/9. Plan + roadmap: `.ai/features/ai-product-extraction/kickoff.md`. |
+| Live AI (Gemini vision, FFmpeg, YOLO/ZXing, CLIP dedup, enrich) | 🟦 Next | Drop-in per the roadmap — no schema/contract changes needed. Implement `@aicos/ai-core` Gemini `vision()` first. Plus the admin review UI (triage bands). |
 
 ## Phase 1 milestones (✅ complete — see `.ai/architecture/reviews/p1-exit-review.md`)
 
