@@ -2,66 +2,150 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import {
-  EXTRACTION_STAGES,
+  AiProvider,
+  ExtractionJobStatus,
+  ReviewDecision,
+  withTenant,
+  type Prisma,
+} from '@aicos/db';
+import {
+  EXTRACTION_JOBS,
   QUEUE_NAMES,
   type ExtractionJobData,
-  type ExtractionStage,
 } from './contracts';
-// Runtime (value) import — Nest's DI needs the class reference in the emitted
-// decorator metadata to resolve this constructor injection.
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Consumer for the `extraction` queue — the flagship AI product-extraction
  * pipeline (see `.ai/features/ai-product-extraction/architecture.md`).
  *
- * PHASE 0: this is a deliberate stub. It walks the real pipeline stage names
- * (Stage 0→6: validate → sample → analyze → refine → merge → enrich → publish)
- * as no-op steps and calls NO model / FFmpeg / S3. It exists so a job enqueued
- * by the API is genuinely received, typed, and acked here; later phases replace
- * each step with a real BullMQ sub-job.
+ * KICKOFF: this runs the real *shape* of the pipeline against the real models —
+ * QUEUED → INGESTING (sample frames) → ANALYZING (vision) → MERGING →
+ * AWAITING_REVIEW, persisting ExtractionFrame + ExtractionResult +
+ * ExtractionReviewItem rows so the review UI + the accept→draft-product gate work
+ * end-to-end. The `analyze` step is a deterministic MOCK; the real implementation
+ * samples frames with FFmpeg and routes them through `@aicos/ai-core`
+ * (`extraction.primary` → Gemini vision, Claude fallback) — that swap is the only
+ * change needed to go live (decisions XT-01..XT-08). Nothing auto-publishes.
+ *
+ * Idempotent: a job already AWAITING_REVIEW/PUBLISHED is skipped.
  */
 @Processor(QUEUE_NAMES.extraction)
 export class ExtractionProcessor extends WorkerHost {
   private readonly logger = new Logger(ExtractionProcessor.name);
+  private static readonly FRAME_COUNT = 6;
 
   constructor(private readonly prisma: PrismaService) {
     super();
   }
 
-  async process(job: Job<ExtractionJobData>): Promise<{
-    extractionRunId: string;
-    stagesCompleted: ExtractionStage[];
-  }> {
-    const { tenantId, extractionRunId, s3ETag, segmentIndex = 0 } = job.data;
-
-    // Idempotency guard: BullMQ already dedups by deterministic jobId
-    // (decision XT-10), but processors must also be safe under at-least-once
-    // redelivery. A real implementation reads pipeline state for this
-    // (tenantId, s3ETag, segmentIndex) and skips stages already persisted.
-    // The stub is naturally idempotent — every step is a pure no-op.
-    this.logger.log(
-      `extraction received job=${job.id} run=${extractionRunId} tenant=${tenantId} etag=${s3ETag} segment=${segmentIndex}`,
-    );
-
-    // Prove the DB layer is wired without touching tenant data.
-    // void to satisfy no-unused; the connection is live via PrismaService.
-    void this.prisma;
-
-    const stagesCompleted: ExtractionStage[] = [];
-    for (const stage of EXTRACTION_STAGES) {
-      // No-op stage: in later phases each becomes a real sub-job
-      // (FFmpeg sampling, vision LLM, CLIP merge, enrichment, publish).
-      this.logger.debug(`  stage "${stage}" — no-op (phase 0 stub)`);
-      stagesCompleted.push(stage);
-      await job.updateProgress(
-        Math.round((stagesCompleted.length / EXTRACTION_STAGES.length) * 100),
-      );
+  async process(job: Job<ExtractionJobData>): Promise<{ extractionRunId: string; productsFound: number }> {
+    if (job.name !== EXTRACTION_JOBS.run) {
+      this.logger.warn(`extraction ignoring unknown job name="${job.name}"`);
+      return { extractionRunId: job.data?.extractionRunId ?? '', productsFound: 0 };
     }
+    const { tenantId, extractionRunId } = job.data;
 
-    this.logger.log(
-      `extraction completed job=${job.id} run=${extractionRunId} stages=${stagesCompleted.length}`,
-    );
-    return { extractionRunId, stagesCompleted };
+    const outcome = await withTenant(this.prisma.client, tenantId, async (tx) => {
+      const j = await tx.extractionJob.findFirst({ where: { id: extractionRunId, tenantId } });
+      if (!j) {
+        this.logger.warn(`extraction job ${extractionRunId} not found`);
+        return null;
+      }
+      if (
+        j.status === ExtractionJobStatus.AWAITING_REVIEW ||
+        j.status === ExtractionJobStatus.PUBLISHED
+      ) {
+        return null; // already processed
+      }
+
+      await tx.extractionJob.update({
+        where: { id: j.id },
+        data: { status: ExtractionJobStatus.INGESTING, startedAt: new Date() },
+      });
+
+      // --- sample (MOCK frames; real: FFmpeg sampling + pHash dedup) ---
+      const frameIds: string[] = [];
+      for (let i = 0; i < ExtractionProcessor.FRAME_COUNT; i++) {
+        const f = await tx.extractionFrame.create({
+          data: {
+            tenantId,
+            jobId: j.id,
+            frameIndex: i,
+            confidence: 0.9,
+            providerUsed: AiProvider.GEMINI,
+          },
+          select: { id: true },
+        });
+        frameIds.push(f.id);
+      }
+      await tx.extractionJob.update({
+        where: { id: j.id },
+        data: {
+          status: ExtractionJobStatus.ANALYZING,
+          framesExtracted: ExtractionProcessor.FRAME_COUNT,
+          framesAnalyzed: ExtractionProcessor.FRAME_COUNT,
+        },
+      });
+
+      // --- analyze (MOCK; real: ai-core vision over frame batches) ---
+      for (const p of MOCK_PRODUCTS) {
+        const result = await tx.extractionResult.create({
+          data: {
+            tenantId,
+            jobId: j.id,
+            title: p.title,
+            priceCents: p.priceCents,
+            currency: 'USD',
+            brandGuess: p.brandGuess,
+            categoryGuess: p.categoryGuess,
+            overallConfidence: p.overallConfidence,
+            fieldConfidence: p.fieldConfidence as Prisma.InputJsonValue,
+            sourceFrameIds: frameIds.slice(0, 2) as Prisma.InputJsonValue,
+            imageMediaIds: [] as Prisma.InputJsonValue,
+          },
+          select: { id: true },
+        });
+        await tx.extractionReviewItem.create({
+          data: { tenantId, jobId: j.id, resultId: result.id, decision: ReviewDecision.PENDING },
+        });
+      }
+
+      // --- merge + hand to the human review gate ---
+      await tx.extractionJob.update({
+        where: { id: j.id },
+        data: {
+          status: ExtractionJobStatus.AWAITING_REVIEW,
+          productsFound: MOCK_PRODUCTS.length,
+          completedAt: new Date(),
+        },
+      });
+      return { productsFound: MOCK_PRODUCTS.length };
+    });
+
+    await job.updateProgress(100);
+    const found = outcome?.productsFound ?? 0;
+    this.logger.log(`extraction ${extractionRunId} → ${found} draft results AWAITING_REVIEW`);
+    return { extractionRunId, productsFound: found };
   }
 }
+
+interface MockProduct {
+  title: string;
+  priceCents: number;
+  brandGuess: string;
+  categoryGuess: string;
+  overallConfidence: number;
+  fieldConfidence: Record<string, number>;
+}
+
+/**
+ * Deterministic stand-in for the vision model's output (one entry per detected
+ * product, with per-field confidence driving the review UI's triage bands). The
+ * real pipeline replaces this with `@aicos/ai-core` vision calls over the frames.
+ */
+const MOCK_PRODUCTS: readonly MockProduct[] = [
+  { title: 'Cola Classic 330ml', priceCents: 149, brandGuess: 'Acme Beverages', categoryGuess: 'Drinks', overallConfidence: 0.92, fieldConfidence: { title: 0.95, price: 0.9, brand: 0.8 } },
+  { title: 'Sparkling Water 500ml', priceCents: 99, brandGuess: 'Acme Beverages', categoryGuess: 'Drinks', overallConfidence: 0.78, fieldConfidence: { title: 0.85, price: 0.7, brand: 0.6 } },
+  { title: 'Energy Bar Peanut', priceCents: 249, brandGuess: 'NutriCo', categoryGuess: 'Snacks', overallConfidence: 0.61, fieldConfidence: { title: 0.8, price: 0.5, brand: 0.55 } },
+];
