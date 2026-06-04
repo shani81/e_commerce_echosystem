@@ -59,6 +59,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_dev_2026}
+      # Browser presigned uploads (admin /extraction) PUT directly to MinIO from
+      # the app origin — allow CORS. Default '*' for dev; lock to the admin/web
+      # origins in prod via MINIO_CORS_ALLOW_ORIGIN.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-*}
     ports:
       - "9200:9000"   # S3 API
       - "9300:9001"   # Console
