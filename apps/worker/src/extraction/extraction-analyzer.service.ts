@@ -63,8 +63,8 @@ export class ExtractionAnalyzer {
         { prompt: EXTRACTION_PROMPT, images, json: true, maxTokens: 2048 },
         { alias: 'extraction.primary' },
       );
-      const parsed = parseProducts(res.text);
-      return parsed.length > 0 ? parsed : [...MOCK];
+      const enriched = enrichProducts(parseProducts(res.text));
+      return enriched.length > 0 ? enriched : [...MOCK];
     } catch (err) {
       this.logger.warn(
         `vision analyze failed — using mock: ${err instanceof Error ? err.message : 'unknown'}`,
@@ -72,6 +72,26 @@ export class ExtractionAnalyzer {
       return [...MOCK];
     }
   }
+}
+
+/**
+ * Deterministic enrichment over the raw vision output: normalize whitespace,
+ * dedup by case-insensitive title (keeping the most-confident detection), and
+ * order best-first so the review grid surfaces strong candidates at the top.
+ */
+export function enrichProducts(products: ExtractedProduct[]): ExtractedProduct[] {
+  const byTitle = new Map<string, ExtractedProduct>();
+  for (const p of products) {
+    const title = p.title.trim().replace(/\s+/g, ' ');
+    if (!title) continue;
+    const key = title.toLowerCase();
+    const cleaned = { ...p, title };
+    const existing = byTitle.get(key);
+    if (!existing || cleaned.overallConfidence > existing.overallConfidence) {
+      byTitle.set(key, cleaned);
+    }
+  }
+  return [...byTitle.values()].sort((a, b) => b.overallConfidence - a.overallConfidence);
 }
 
 function parseProducts(text: string): ExtractedProduct[] {

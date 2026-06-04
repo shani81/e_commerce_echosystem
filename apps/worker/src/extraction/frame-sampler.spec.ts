@@ -16,6 +16,8 @@ import {
   extractVideoFrames,
   hamming,
   isVideo,
+  laplacianVariance,
+  sharpFrameIndices,
   type SourceMedia,
 } from './frame-sampler.service';
 
@@ -38,13 +40,14 @@ function run(cmd: string, args: string[]): Promise<void> {
   });
 }
 
-/** Synthesize a 4s clip from a lavfi source with the always-available mpeg4 encoder. */
-async function makeVideo(source: string): Promise<Buffer> {
+/** Synthesize a 4s clip from a lavfi source (optionally blurred) with mpeg4. */
+async function makeVideo(source: string, filter?: string): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'aicos-test-vid-'));
   const out = join(dir, 'test.mp4');
   await run(ffmpegPath as string, [
     '-hide_banner', '-loglevel', 'error',
     '-f', 'lavfi', '-i', source, '-t', '4',
+    ...(filter ? ['-vf', filter] : []),
     '-c:v', 'mpeg4', '-pix_fmt', 'yuv420p', out,
   ]);
   const buf = await readFile(out);
@@ -69,16 +72,34 @@ describe('frame-sampler helpers', () => {
     expect(computeFps(10000, 6)).toBe(0.05); // clamped to MIN_FPS
   });
 
-  it('buildVideoFrameArgs() emits two aligned outputs (jpeg + gray hash strip)', () => {
-    const args = buildVideoFrameArgs('/in.mp4', '/f_%03d.jpg', '/h.gray', 1.5, 6);
+  it('buildVideoFrameArgs() emits three aligned outputs (jpeg + hash + blur strips)', () => {
+    const args = buildVideoFrameArgs('/in.mp4', '/f_%03d.jpg', '/h.gray', '/b.gray', 1.5, 6);
     expect(args).toContain('/in.mp4');
     expect(args).toContain('/f_%03d.jpg');
     expect(args).toContain('/h.gray');
-    expect(args.filter((a) => a === '-vf')).toHaveLength(2);
-    expect(args.filter((a) => a === '-frames:v')).toHaveLength(2);
+    expect(args).toContain('/b.gray');
+    expect(args.filter((a) => a === '-vf')).toHaveLength(3);
+    expect(args.filter((a) => a === '-frames:v')).toHaveLength(3);
     const joined = args.join(' ');
     expect(joined).toContain('fps=1.5,scale=768:-2');
     expect(joined).toContain('fps=1.5,scale=9:8,format=gray');
+    expect(joined).toContain('fps=1.5,scale=64:64,format=gray');
+  });
+
+  it('laplacianVariance() is ~0 for a flat image and high for an edge', () => {
+    expect(laplacianVariance(Buffer.alloc(64, 128), 8, 8)).toBe(0); // flat → no edges
+    // Sharp vertical edge (left half black, right half white) → non-zero variance.
+    const edge = Buffer.from(
+      Array.from({ length: 64 }, (_, i) => (i % 8 < 4 ? 0 : 255)),
+    );
+    expect(laplacianVariance(edge, 8, 8)).toBeGreaterThan(0);
+  });
+
+  it('sharpFrameIndices() drops frames far below the median sharpness', () => {
+    // One blurry outlier (1) among sharp frames → dropped.
+    expect(sharpFrameIndices([100, 1, 110, 105, 98], 0.5, 2)).toEqual([0, 2, 3, 4]);
+    // All similar → keep everything.
+    expect(sharpFrameIndices([100, 98, 102, 101], 0.5, 2)).toEqual([0, 1, 2, 3]);
   });
 
   it('dHash()/hamming() compute a 64-bit difference hash', () => {
@@ -127,6 +148,8 @@ describe('extractVideoFrames (real ffmpeg)', () => {
         expect(f.jpeg[1]).toBe(0xd8);
         expect(typeof f.timestampMs).toBe('number');
         expect(f.timestampMs).toBeGreaterThan(prev); // monotonic, evenly spaced
+        expect(typeof f.blurScore).toBe('number');
+        expect(f.blurScore as number).toBeGreaterThan(0); // detailed fractal → sharp
         prev = f.timestampMs;
       }
     },
@@ -142,5 +165,23 @@ describe('extractVideoFrames (real ffmpeg)', () => {
       expect(frames).toHaveLength(1);
     },
     30000,
+  );
+
+  itFfmpeg(
+    'scores a blurred clip lower than a sharp clip',
+    async () => {
+      const mean = (fs: { blurScore: number | null }[]) =>
+        fs.reduce((s, f) => s + (f.blurScore ?? 0), 0) / Math.max(1, fs.length);
+      const src = 'mandelbrot=size=320x240:rate=10';
+      const sharp = await extractVideoFrames(ffmpegPath as string, ffprobePath, await makeVideo(src), 6);
+      const blurry = await extractVideoFrames(
+        ffmpegPath as string,
+        ffprobePath,
+        await makeVideo(src, 'boxblur=10:2'),
+        6,
+      );
+      expect(mean(sharp)).toBeGreaterThan(mean(blurry));
+    },
+    45000,
   );
 });

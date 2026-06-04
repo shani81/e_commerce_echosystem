@@ -23,6 +23,8 @@ export interface SourceMedia {
 export interface SampledFrame {
   frameIndex: number;
   timestampMs: number | null;
+  /** Laplacian-variance sharpness (higher = sharper); null if not computed. */
+  blurScore: number | null;
   image: AiImage;
 }
 
@@ -33,6 +35,10 @@ const SCALE_WIDTH = 768; // downscale frames to keep vision payloads small
 const HASH_W = 9; // dHash source width (9 cols → 8 horizontal comparisons)
 const HASH_H = 8; // dHash source height (8 rows → 64-bit hash)
 const DEDUP_HAMMING = 6; // frames within this Hamming distance are near-duplicates
+const BLUR_W = 64; // sharpness-measure render size (square; aspect irrelevant for variance)
+const BLUR_H = 64;
+const BLUR_REL = 0.5; // drop frames sharper-than this fraction of the median, keep ≥ MIN_KEEP
+const MIN_KEEP = 2; // never blur-prune below this many frames
 
 /**
  * Samples vision-ready frames from an uploaded shelf video (or photo) — JOB 1 of
@@ -41,7 +47,9 @@ const DEDUP_HAMMING = 6; // frames within this Hamming distance are near-duplica
  *    across the whole clip (fps = maxFrames / duration), not just the first
  *    seconds;
  *  - **perceptual dedup**: a 9×8 grayscale dHash per frame drops near-identical
- *    frames (camera lingering) so the vision model sees a diverse set.
+ *    frames (camera lingering) so the vision model sees a diverse set;
+ *  - **blur scoring**: a 64×64 grayscale Laplacian-variance per frame drops
+ *    motion-blurred frames (and is persisted on each ExtractionFrame).
  * Images pass through unchanged. Every failure path (no object store, missing
  * object, ffmpeg/ffprobe error) returns an empty array so the processor falls
  * back to its deterministic mock — the pipeline stays exercisable everywhere.
@@ -96,6 +104,7 @@ export class FrameSamplerService {
           {
             frameIndex: 0,
             timestampMs: 0,
+            blurScore: null,
             image: { base64: bytes.toString('base64'), mimeType: media.mimeType ?? 'image/jpeg' },
           },
         ];
@@ -108,6 +117,7 @@ export class FrameSamplerService {
       return frames.map((f, i) => ({
         frameIndex: i,
         timestampMs: f.timestampMs,
+        blurScore: f.blurScore,
         image: { base64: f.jpeg.toString('base64'), mimeType: 'image/jpeg' },
       }));
     } catch (err) {
@@ -174,11 +184,58 @@ export function dedupeByHash<T extends { hash: bigint }>(frames: T[], threshold 
   return kept;
 }
 
-/** ffmpeg args for two aligned outputs: downscaled JPEGs + a 9×8 gray hash strip. */
+/**
+ * Variance of the Laplacian over a `w`×`h` grayscale buffer — the classic focus
+ * measure. Higher = sharper; motion-blur / out-of-focus frames score low.
+ */
+export function laplacianVariance(gray: Buffer, w: number, h: number): number {
+  let sum = 0;
+  let sumSq = 0;
+  let n = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const lap =
+        4 * (gray[i] ?? 0) -
+        (gray[i - 1] ?? 0) -
+        (gray[i + 1] ?? 0) -
+        (gray[i - w] ?? 0) -
+        (gray[i + w] ?? 0);
+      sum += lap;
+      sumSq += lap * lap;
+      n++;
+    }
+  }
+  if (n === 0) return 0;
+  const mean = sum / n;
+  return sumSq / n - mean * mean;
+}
+
+/**
+ * Indices (ascending) of frames to keep after blur-pruning: drop frames far
+ * below the median sharpness, but never below `minKeep` (then keep the sharpest).
+ */
+export function sharpFrameIndices(blurScores: number[], relThreshold = BLUR_REL, minKeep = MIN_KEEP): number[] {
+  const all = blurScores.map((_, i) => i);
+  if (blurScores.length <= minKeep) return all;
+  const sorted = [...blurScores].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  const floor = median * relThreshold;
+  const sharp = all.filter((i) => (blurScores[i] ?? 0) >= floor);
+  if (sharp.length >= minKeep) return sharp;
+  // Everything is ~blurry → keep the sharpest `minKeep`, in temporal order.
+  return [...all]
+    .sort((a, b) => (blurScores[b] ?? 0) - (blurScores[a] ?? 0))
+    .slice(0, minKeep)
+    .sort((a, b) => a - b);
+}
+
+/** ffmpeg args for three aligned outputs: JPEGs + a 9×8 hash strip + a 64×64 blur strip. */
 export function buildVideoFrameArgs(
   inputPath: string,
   jpegPattern: string,
   hashPath: string,
+  blurPath: string,
   fps: number,
   maxFrames: number,
 ): string[] {
@@ -208,6 +265,14 @@ export function buildVideoFrameArgs(
     '-f',
     'rawvideo',
     hashPath,
+    // Output 3 — 64×64 grayscale strip for the Laplacian-variance blur score.
+    '-vf',
+    `${vf},scale=${BLUR_W}:${BLUR_H},format=gray`,
+    '-frames:v',
+    n,
+    '-f',
+    'rawvideo',
+    blurPath,
   ];
 }
 
@@ -221,50 +286,73 @@ export async function extractVideoFrames(
   ffprobePath: string | null,
   input: Buffer,
   maxFrames: number,
-): Promise<{ timestampMs: number; jpeg: Buffer }[]> {
+): Promise<{ timestampMs: number; jpeg: Buffer; blurScore: number | null }[]> {
   const dir = await mkdtemp(join(tmpdir(), 'aicos-extract-'));
   const inputPath = join(dir, 'input');
   const jpegPattern = join(dir, 'frame_%03d.jpg');
   const hashPath = join(dir, 'hashes.gray');
+  const blurPath = join(dir, 'blur.gray');
   try {
     await writeFile(inputPath, input);
     const duration = ffprobePath ? await probeDuration(ffprobePath, inputPath) : null;
     const fps = computeFps(duration, maxFrames);
 
-    await runFfmpeg(ffmpegPath, buildVideoFrameArgs(inputPath, jpegPattern, hashPath, fps, maxFrames));
+    await runFfmpeg(
+      ffmpegPath,
+      buildVideoFrameArgs(inputPath, jpegPattern, hashPath, blurPath, fps, maxFrames),
+    );
 
     const files = (await readdir(dir))
       .filter((f) => f.startsWith('frame_') && f.endsWith('.jpg'))
       .sort();
     const jpegs = await Promise.all(files.map((f) => readFile(join(dir, f))));
 
-    // Read the aligned 9×8 gray strip (one HASH_W*HASH_H chunk per frame).
-    let hashes: bigint[] = [];
-    try {
-      const raw = await readFile(hashPath);
-      const per = HASH_W * HASH_H;
-      for (let i = 0; i + per <= raw.length; i += per) hashes.push(dHash(raw.subarray(i, i + per)));
-    } catch {
-      hashes = [];
-    }
+    // Aligned 9×8 gray strip → dHash per frame.
+    const hashes = await readChunks(hashPath, HASH_W * HASH_H, (c) => dHash(c));
+    // Aligned 64×64 gray strip → Laplacian-variance blur score per frame.
+    const blurs = await readChunks(blurPath, BLUR_W * BLUR_H, (c) => laplacianVariance(c, BLUR_W, BLUR_H));
 
-    const frames = jpegs.map((jpeg, i) => ({
+    interface WorkFrame {
+      timestampMs: number;
+      jpeg: Buffer;
+      hash: bigint | null;
+      blurScore: number | null;
+    }
+    let kept: WorkFrame[] = jpegs.map((jpeg, i) => ({
       timestampMs: Math.round((i * 1000) / fps),
       jpeg,
       hash: hashes[i] ?? null,
+      blurScore: blurs[i] ?? null,
     }));
 
-    // Dedupe only when every frame got an aligned hash; otherwise keep all (safe).
-    const allHashed = frames.length > 0 && frames.every((f) => f.hash !== null);
-    const kept = allHashed
-      ? dedupeByHash(
-          frames.map((f) => ({ timestampMs: f.timestampMs, jpeg: f.jpeg, hash: f.hash as bigint })),
-        )
-      : frames;
+    // 1) Blur-prune motion-blurred frames (only when every frame has a score).
+    if (kept.length > 0 && kept.every((f) => f.blurScore !== null)) {
+      const keep = new Set(sharpFrameIndices(kept.map((f) => f.blurScore as number)));
+      kept = kept.filter((_, i) => keep.has(i));
+    }
 
-    return kept.map((f) => ({ timestampMs: f.timestampMs, jpeg: f.jpeg }));
+    // 2) Dedup near-identical survivors (only when every survivor has a hash).
+    if (kept.length > 0 && kept.every((f) => f.hash !== null)) {
+      kept = dedupeByHash(kept as (WorkFrame & { hash: bigint })[]);
+    }
+
+    return kept.map((f) => ({ timestampMs: f.timestampMs, jpeg: f.jpeg, blurScore: f.blurScore }));
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/** Read a concatenated raw file as fixed-size chunks, mapping each chunk. */
+async function readChunks<T>(path: string, chunkBytes: number, map: (chunk: Buffer) => T): Promise<T[]> {
+  try {
+    const raw = await readFile(path);
+    const out: T[] = [];
+    for (let i = 0; i + chunkBytes <= raw.length; i += chunkBytes) {
+      out.push(map(raw.subarray(i, i + chunkBytes)));
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 

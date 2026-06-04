@@ -1,6 +1,6 @@
 import type { ConfigService } from '@nestjs/config';
 import type { AiImage } from '@aicos/ai-core';
-import { ExtractionAnalyzer } from './extraction-analyzer.service';
+import { ExtractionAnalyzer, enrichProducts } from './extraction-analyzer.service';
 
 const cfg = (env: Record<string, string | undefined>) =>
   ({ get: (k: string) => env[k] }) as unknown as ConfigService;
@@ -65,5 +65,33 @@ describe('ExtractionAnalyzer', () => {
       .mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' }) as unknown as typeof fetch;
     const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
     expect(out).toHaveLength(3); // mock
+  });
+
+  it('dedupes vision products by title (keeps most confident) and orders best-first', async () => {
+    const products = [
+      { title: ' Cola ', priceCents: 149, confidence: 0.6, fieldConfidence: {} },
+      { title: 'cola', priceCents: 150, confidence: 0.9, fieldConfidence: {} },
+      { title: 'Water', priceCents: 99, confidence: 0.7, fieldConfidence: {} },
+      { title: '   ', confidence: 0.99, fieldConfidence: {} }, // empty → dropped
+    ];
+    global.fetch = jest.fn().mockResolvedValue(geminiOk(JSON.stringify(products))) as unknown as typeof fetch;
+
+    const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
+
+    expect(out.map((p) => p.title)).toEqual(['cola', 'Water']); // deduped, empty dropped, confidence-ordered
+    expect(out[0]?.overallConfidence).toBeCloseTo(0.9);
+    expect(out[0]?.priceCents).toBe(150); // the more-confident instance won
+  });
+});
+
+describe('enrichProducts (unit)', () => {
+  it('normalizes whitespace, dedupes by title, and sorts by confidence', () => {
+    const out = enrichProducts([
+      { title: 'A  B', priceCents: 1, brandGuess: null, categoryGuess: null, overallConfidence: 0.5, fieldConfidence: {} },
+      { title: 'a b', priceCents: 2, brandGuess: null, categoryGuess: null, overallConfidence: 0.8, fieldConfidence: {} },
+      { title: 'Zed', priceCents: 3, brandGuess: null, categoryGuess: null, overallConfidence: 0.9, fieldConfidence: {} },
+    ]);
+    expect(out.map((p) => p.title)).toEqual(['Zed', 'a b']); // 'A  B'/'a b' merged → most confident (0.8)
+    expect(out[1]?.priceCents).toBe(2);
   });
 });
