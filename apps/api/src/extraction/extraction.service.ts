@@ -11,9 +11,12 @@ import {
   QUEUE_NAMES,
   type ExtractionJobData,
 } from '@aicos/shared';
+import { randomUUID } from 'node:crypto';
 import {
   ExtractionJobStatus,
   ExtractionSource,
+  MediaStatus,
+  MediaType,
   ProductStatus,
   ProductType,
   ReviewDecision,
@@ -21,7 +24,7 @@ import {
 } from '@aicos/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../media/s3.service';
-import { lookupBarcodeProduct } from './barcode-lookup.util';
+import { fetchImageBytes, lookupBarcodeProduct } from './barcode-lookup.util';
 import type { PaginatedResult, PaginationDto } from '../common/dto/pagination.dto';
 import type { CreateExtractionDto } from './dto/create-extraction.dto';
 
@@ -144,7 +147,28 @@ export class ExtractionService {
             : null,
       })),
     );
-    return { ...job, frames };
+
+    // Presign each result's grabbed product image (imageMediaIds[0]) for review.
+    const mediaIds = job.results.flatMap((r) => asIdArray(r.imageMediaIds));
+    const keyById = new Map<string, string>();
+    if (mediaIds.length > 0 && this.s3.isConfigured) {
+      const assets = await this.prisma.forTenant(tenantId, (tx) =>
+        tx.mediaAsset.findMany({
+          where: { id: { in: mediaIds }, tenantId },
+          select: { id: true, objectKey: true },
+        }),
+      );
+      for (const a of assets) keyById.set(a.id, a.objectKey);
+    }
+    const results = await Promise.all(
+      job.results.map(async (r) => {
+        const firstId = asIdArray(r.imageMediaIds)[0];
+        const key = firstId ? keyById.get(firstId) : undefined;
+        const imageUrl = key ? await this.s3.presignDownload(key).catch(() => null) : null;
+        return { ...r, imageUrl };
+      }),
+    );
+    return { ...job, results, frames };
   }
 
   /** Delete a job + (cascade) its frames/results/review items. Accepted products
@@ -172,7 +196,26 @@ export class ExtractionService {
     if (!job) throw new NotFoundException('Extraction job not found');
 
     const looked = await lookupBarcodeProduct(code);
+    // Grab the canonical product image into our storage (best-effort).
+    const grabbed = looked?.imageUrl ? await this.grabImage(looked.imageUrl, code) : null;
+
     const result = await this.prisma.forTenant(tenantId, async (tx) => {
+      let imageMediaIds: string[] = [];
+      if (grabbed) {
+        const asset = await tx.mediaAsset.create({
+          data: {
+            tenantId,
+            type: MediaType.IMAGE,
+            status: MediaStatus.READY,
+            bucket: grabbed.bucket,
+            objectKey: grabbed.objectKey,
+            mimeType: grabbed.contentType,
+            isTemporary: true,
+          },
+          select: { id: true },
+        });
+        imageMediaIds = [asset.id];
+      }
       const r = await tx.extractionResult.create({
         data: {
           tenantId,
@@ -185,7 +228,7 @@ export class ExtractionService {
           overallConfidence: looked ? 0.95 : 0.5,
           fieldConfidence: { title: looked ? 0.95 : 0.3 } as Prisma.InputJsonValue,
           sourceFrameIds: [] as Prisma.InputJsonValue,
-          imageMediaIds: [] as Prisma.InputJsonValue,
+          imageMediaIds: imageMediaIds as Prisma.InputJsonValue,
         },
         select: { id: true },
       });
@@ -195,8 +238,28 @@ export class ExtractionService {
       return r;
     });
 
-    this.logger.log(`extraction ${jobId}: manual barcode ${code} → result ${result.id} (found=${Boolean(looked)})`);
-    return { id: result.id, found: Boolean(looked), title: looked?.title ?? null };
+    this.logger.log(
+      `extraction ${jobId}: manual barcode ${code} → result ${result.id} (found=${Boolean(looked)}, image=${Boolean(grabbed)})`,
+    );
+    return { id: result.id, found: Boolean(looked), title: looked?.title ?? null, image: Boolean(grabbed) };
+  }
+
+  /** Download a product image and store it as a tenant MediaAsset (best-effort). */
+  private async grabImage(
+    url: string,
+    code: string,
+  ): Promise<{ bucket: string; objectKey: string; contentType: string } | null> {
+    if (!this.s3.isConfigured) return null;
+    const img = await fetchImageBytes(url);
+    if (!img) return null;
+    const ext = img.contentType.includes('png') ? 'png' : 'jpg';
+    const objectKey = `extractions/barcode/${code}-${randomUUID()}.${ext}`;
+    try {
+      await this.s3.putObject(objectKey, img.bytes, img.contentType);
+      return { bucket: this.s3.bucket, objectKey, contentType: img.contentType };
+    } catch {
+      return null;
+    }
   }
 
   /** Human gate: accept an extracted result → create a DRAFT product for it. */
@@ -242,6 +305,24 @@ export class ExtractionService {
         select: { id: true, slug: true, status: true },
       });
 
+      // Attach grabbed product images (first = primary) so the catalog has a photo.
+      const imageIds = asIdArray(result.imageMediaIds);
+      for (let i = 0; i < imageIds.length; i++) {
+        const image = await tx.productImage.create({
+          data: {
+            tenantId,
+            productId: created.id,
+            mediaId: imageIds[i]!,
+            position: i,
+            isPrimary: i === 0,
+          },
+          select: { id: true },
+        });
+        if (i === 0) {
+          await tx.product.update({ where: { id: created.id }, data: { primaryImageId: image.id } });
+        }
+      }
+
       if (result.reviewItem) {
         await tx.extractionReviewItem.update({
           where: { id: result.reviewItem.id },
@@ -258,6 +339,11 @@ export class ExtractionService {
     this.logger.log(`extraction result ${resultId} accepted → draft product ${product.id}`);
     return product;
   }
+}
+
+/** Coerce a JSON `imageMediaIds` value into a string[] of media ids. */
+function asIdArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 }
 
 function slugify(s: string): string {

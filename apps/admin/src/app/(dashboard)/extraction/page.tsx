@@ -26,6 +26,7 @@ interface ResultReview {
   brandGuess: string | null;
   categoryGuess: string | null;
   overallConfidence: number;
+  imageUrl: string | null;
   reviewItem: { decision: string } | null;
   product: { id: string; slug: string; status: string } | null;
 }
@@ -491,21 +492,32 @@ function JobReviewPanel({
                 return (
                   <tr key={r.id}>
                     <td className="py-2 text-neutral-800">
-                      {r.title ?? 'Untitled'}
-                      {r.brandGuess ? <span className="text-neutral-400"> · {r.brandGuess}</span> : null}
-                      {r.categoryGuess ? (
-                        <span className="ml-2 text-xs text-neutral-400">{r.categoryGuess}</span>
-                      ) : null}
-                      {r.barcode ? (
-                        <button
-                          type="button"
-                          onClick={() => pickBarcode(r.barcode!)}
-                          title="Click to copy + fill the barcode box above (re-look-up if the name looks wrong)"
-                          className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-500 hover:bg-brand-50 hover:text-brand-700"
-                        >
-                          {copied === r.barcode ? '✓ copied' : `⧉ ${r.barcode}`}
-                        </button>
-                      ) : null}
+                      <div className="flex items-center gap-2">
+                        {r.imageUrl ? (
+                          <img
+                            src={r.imageUrl}
+                            alt=""
+                            className="h-10 w-10 shrink-0 rounded border border-neutral-200 object-cover"
+                          />
+                        ) : null}
+                        <span>
+                          {r.title ?? 'Untitled'}
+                          {r.brandGuess ? <span className="text-neutral-400"> · {r.brandGuess}</span> : null}
+                          {r.categoryGuess ? (
+                            <span className="ml-2 text-xs text-neutral-400">{r.categoryGuess}</span>
+                          ) : null}
+                          {r.barcode ? (
+                            <button
+                              type="button"
+                              onClick={() => pickBarcode(r.barcode!)}
+                              title="Click to copy + fill the barcode box above (re-look-up if the name looks wrong)"
+                              className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-500 hover:bg-brand-50 hover:text-brand-700"
+                            >
+                              {copied === r.barcode ? '✓ copied' : `⧉ ${r.barcode}`}
+                            </button>
+                          ) : null}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-2">
                       <Badge variant={b.variant}>
