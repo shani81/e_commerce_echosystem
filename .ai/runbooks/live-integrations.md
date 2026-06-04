@@ -9,6 +9,7 @@ keys are absent; this is purely about wiring real credentials + verifying delive
 | **SMTP / email** (Mailhog) | ✅ **Live** — verified | nothing (local infra) |
 | **Stripe** (Checkout + Connect + webhooks) | ⚙️ Ready — needs keys | Stripe **test** keys + Stripe CLI |
 | **Shippo** (label purchase) | ⚙️ Manual flow live; auto-label needs key | Shippo **test** API key |
+| **Gemini vision** (AI extraction) | ⚙️ Ready — needs key | **Gemini API key** (Google AI Studio) |
 
 ---
 
@@ -84,6 +85,59 @@ Live-run checklist (needs a test key):
 4. `POST /orders/:id/shipments { "buyLabel": true }` → verify `labelUrlCached` + tracking populated.
 Request shaping is unit-tested (`shippo.service.spec.ts`); verify field shapes against live Shippo
 on first real run.
+
+---
+
+## 4. Gemini vision — AI product extraction (LIVE-READY)
+
+The flagship extraction loop (admin **AI Extraction** → upload a shelf video → AI drafts a
+catalog → human review → accept to DRAFT) is fully wired. The worker samples real frames with
+ffmpeg (JOB 1) and sends them to **Gemini vision**; the only thing missing for a live run is the
+API key.
+
+### Which Gemini API — exactly
+
+- **API:** Google **Gemini API** (a.k.a. the **Generative Language API**), endpoint
+  `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`.
+  This is the **Google AI Studio** key path — **NOT Vertex AI** (Vertex uses GCP
+  service-account OAuth; we use a simple API key in the query string).
+- **Where to get it:** **Google AI Studio → Get API key** → https://aistudio.google.com/apikey
+  (create a key; the free tier is rate-limited but works for testing). No GCP project/billing
+  setup required for the AI Studio key.
+- **Model:** `gemini-2.0-flash` (default; used for both chat + vision). Override per call via
+  `request.model` or the provider's `model` config. Embeddings (`text-embedding-004`) are stubbed
+  and unused here.
+- **Capability used:** `:generateContent` with **inline image data**
+  (`inline_data: { mime_type, data: <base64 frame> }`) and `responseMimeType: application/json`.
+
+### Turn it on
+
+1. `GEMINI_API_KEY=AIza...` in `.env` (already in `turbo.json` `globalEnv` + `.env.example`).
+2. `pnpm infra:up` then `pnpm dev`.
+3. Admin **AI Extraction** (`http://localhost:3100/extraction`) → **Upload & extract** a shelf
+   video (or photo). The browser presigns a PUT to MinIO, confirms the asset, and starts the job.
+4. The worker: `INGESTING` (downloads from MinIO, ffmpeg samples ≤6 frames @1fps) → `ANALYZING`
+   (Gemini vision → JSON products) → `AWAITING_REVIEW`. Review the triage-band grid and
+   **Accept → draft** each product; publish from **Catalog**. Nothing publishes on its own.
+
+### Graceful fallback (no key / no media / decode error)
+
+`ExtractionAnalyzer` falls back to a deterministic 3-product **mock**, and the processor falls back
+to placeholder frames — so the pipeline + review gate stay exercisable without a key or real media.
+Live vs. mock is logged per job: `… (N frames, live vision | mock …)`.
+
+### Object-store CORS (already handled)
+
+Browser presigned uploads PUT straight to MinIO from the app origin. MinIO is configured with
+`MINIO_API_CORS_ALLOW_ORIGIN` (default `*` for dev — see `docker-compose.yml`); the preflight
+(`OPTIONS` → `204` with `Access-Control-Allow-Origin`/`-Methods: PUT`/`-Headers: content-type`) is
+**verified working**. In prod, set `MINIO_CORS_ALLOW_ORIGIN` to the admin + web origins. For
+**R2/S3** instead of MinIO, add an equivalent bucket CORS rule (allow `PUT`, the app origins,
+`content-type`).
+
+**Verified (local):** real MinIO round-trip + ffmpeg sampling produces JPEG frames from an uploaded
+clip; the `frame-sampler` unit/integration tests cover ffmpeg sampling in CI. The live Gemini call
+itself is the only step that needs your key.
 
 ---
 
