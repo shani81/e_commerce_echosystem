@@ -10,6 +10,9 @@ module.exports = {
   rootDir: 'src',
   moduleFileExtensions: ['js', 'json', 'ts'],
   testRegex: '.*\\.(spec|test)\\.ts$',
+  // Load the reflect-metadata polyfill before any spec (mirrors main.ts) so
+  // class-validator/class-transformer decorators on imported DTOs evaluate.
+  setupFiles: ['reflect-metadata'],
   transform: {
     '^.+\\.(t|j)s$': [
       '@swc/jest',

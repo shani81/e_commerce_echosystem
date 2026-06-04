@@ -1,9 +1,19 @@
 # AICOS — In Progress
 
-> **PHASE 1 — Core Commerce MVP — feature-complete** (M1.1–M1.6 done). Trunk: `main`. Current work: branch `feat/p1-m1.4-m1.6`. Phase 0 complete (exit review 🟢 GO).
+> **PHASE 2 — Production-Hardening (in progress).** Phase 1 Core Commerce MVP is feature-complete (M1.1–M1.6, exit review 🟢 GO, tagged `v0.1.0-mvp`). Trunk: `main`. Current work: branch `feat/p2.1-test-suite`.
 > Last updated: 2026-06-04.
 
-## Phase 1 milestones
+## Phase 2 — Production-Hardening milestones
+
+| Milestone | Status | Notes |
+|-----------|--------|-------|
+| **P2.1** Test suite + CI gating | 🟨 In progress | First batch: critical pure logic extracted to testable units (RBAC match, platform-fee math, CSV import parsing) + Jest specs; `reflect-metadata` setup so DTO specs run. **35 tests / 5 suites green.** Next: service-level + worker tests, DB-integration tests, CI gate on `pnpm test`. |
+| **P2.2** Auth/session security | 🟦 Planned | httpOnly-cookie sessions + refresh rotation, rate limiting, remove JWT-in-localStorage. |
+| **P2.3** Live integrations | 🟦 Planned | Stripe test-mode e2e (`stripe listen`), Shippo auto-label, real SMTP + runbooks. |
+| **P2.4** Perf + observability | 🟦 Planned | k6 load tests, BullMQ queue-depth + business metrics, dashboards/alerts, DB index review. |
+| **P2.5** Ops / CD | 🟦 Planned | App Dockerfiles, CI build+test gating, Doppler secrets. |
+
+## Phase 1 milestones (✅ complete — see `.ai/architecture/reviews/p1-exit-review.md`)
 
 | Milestone | Status | Notes |
 |-----------|--------|-------|

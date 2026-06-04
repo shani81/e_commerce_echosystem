@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { PERMISSIONS_KEY } from '../decorators/roles.decorator';
+import { isPermissionGranted } from '../rbac/match';
 import type { AuthenticatedUser } from '../types/authenticated-user';
 
 /**
@@ -40,21 +41,12 @@ export class RolesGuard implements CanActivate {
     }
 
     const granted = new Set(user.permissions ?? []);
-    const hasAll = required.every((perm) => this.isGranted(perm, granted));
+    const hasAll = required.every((perm) => isPermissionGranted(perm, granted));
     if (!hasAll) {
       throw new ForbiddenException(
         `Insufficient permissions: requires ${required.join(', ')}`,
       );
     }
     return true;
-  }
-
-  private isGranted(required: string, granted: Set<string>): boolean {
-    // Global wildcards — both `*` and `*:*` grant everything (the seeded owner /
-    // super-admin roles use one or the other).
-    if (granted.has('*') || granted.has('*:*')) return true;
-    if (granted.has(required)) return true;
-    const [resource] = required.split(':');
-    return granted.has(`${resource}:*`);
   }
 }

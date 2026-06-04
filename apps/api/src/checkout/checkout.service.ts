@@ -16,6 +16,7 @@ import {
 } from '@aicos/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../billing/stripe.service';
+import { platformFeeCents } from './fee.util';
 import type { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 interface CheckoutResult {
@@ -96,7 +97,7 @@ export class CheckoutService {
       tx.connectAccount.findUnique({ where: { tenantId } }),
     );
     const useConnect = Boolean(connect?.chargesEnabled && connect.stripeAccountId);
-    const applicationFeeCents = useConnect ? Math.round((subtotalCents * feeBps) / 10_000) : 0;
+    const applicationFeeCents = useConnect ? platformFeeCents(subtotalCents, feeBps) : 0;
 
     // Create the DRAFT order (+ line snapshots) before opening the session, so
     // the session metadata can carry the order id for webhook reconciliation.
