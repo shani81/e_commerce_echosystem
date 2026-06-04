@@ -31,7 +31,7 @@ export interface SampledFrame {
 const DEFAULT_FPS = 1; // fallback when duration is unknown
 const MIN_FPS = 0.05; // never slower than ~1 frame / 20s
 const MAX_FPS = 30; // never faster than the source
-const SCALE_WIDTH = 768; // downscale frames to keep vision payloads small
+const SCALE_WIDTH = 1024; // wide enough for the model to read barcodes/labels
 const HASH_W = 9; // dHash source width (9 cols → 8 horizontal comparisons)
 const HASH_H = 8; // dHash source height (8 rows → 64-bit hash)
 const DEDUP_HAMMING = 6; // frames within this Hamming distance are near-duplicates

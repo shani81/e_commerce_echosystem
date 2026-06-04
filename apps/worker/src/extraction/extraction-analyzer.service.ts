@@ -82,7 +82,7 @@ export class ExtractionAnalyzer {
       : EXTRACTION_PROMPT;
     try {
       const res = await this.router.vision(
-        { prompt, images, json: true, maxTokens: 2048 },
+        { prompt, images, json: true, maxTokens: 4096 },
         { alias: 'extraction.primary' },
       );
       const enriched = enrichProducts(parseProducts(res.text));

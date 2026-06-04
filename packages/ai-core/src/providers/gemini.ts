@@ -18,6 +18,8 @@ export interface GeminiProviderConfig {
   /** Override the default embeddings model id. */
   embedModel?: string;
   baseUrl?: string;
+  /** 2.5-series thinking budget; 0 (default) disables thinking for clean JSON. */
+  thinkingBudget?: number;
 }
 
 interface GeminiPart {
@@ -80,6 +82,10 @@ export class GeminiProvider implements AiProvider {
         ...(request.temperature != null ? { temperature: request.temperature } : {}),
         ...(request.maxTokens ? { maxOutputTokens: request.maxTokens } : {}),
         ...(request.json ? { responseMimeType: 'application/json' } : {}),
+        // Disable 2.5-series "thinking": it spends the output-token budget on
+        // reasoning and can truncate the structured JSON (→ empty result).
+        // Ignored by non-thinking models.
+        thinkingConfig: { thinkingBudget: this.config.thinkingBudget ?? 0 },
       },
     };
 
