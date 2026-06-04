@@ -221,6 +221,7 @@ export class ExtractionProcessor extends WorkerHost {
             title: p.title,
             priceCents: p.priceCents,
             currency: 'USD',
+            barcode: p.barcode ?? null,
             brandGuess: p.brandGuess,
             categoryGuess: p.categoryGuess,
             overallConfidence: p.overallConfidence,

@@ -189,6 +189,8 @@ export class ExtractionService {
                 title: 'Default',
                 priceCents: result.priceCents ?? 0,
                 currency: result.currency ?? 'USD',
+                // Carry the looked-up GTIN/UPC/EAN onto the product variant.
+                ...(result.barcode ? { barcode: result.barcode } : {}),
                 ...(result.fieldConfidence
                   ? { fieldConfidence: result.fieldConfidence as Prisma.InputJsonValue }
                   : {}),

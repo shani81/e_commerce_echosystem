@@ -22,6 +22,7 @@ interface ResultReview {
   title: string | null;
   priceCents: number | null;
   currency: string | null;
+  barcode: string | null;
   brandGuess: string | null;
   categoryGuess: string | null;
   overallConfidence: number;
@@ -350,6 +351,11 @@ function JobReviewPanel({
                       {r.brandGuess ? <span className="text-neutral-400"> · {r.brandGuess}</span> : null}
                       {r.categoryGuess ? (
                         <span className="ml-2 text-xs text-neutral-400">{r.categoryGuess}</span>
+                      ) : null}
+                      {r.barcode ? (
+                        <span className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-500">
+                          {r.barcode}
+                        </span>
                       ) : null}
                     </td>
                     <td className="py-2">
