@@ -360,6 +360,7 @@ function JobReviewPanel({
   const [barcode, setBarcode] = React.useState('');
   const [addingBarcode, setAddingBarcode] = React.useState(false);
   const [barcodeMsg, setBarcodeMsg] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState<string | null>(null);
 
   async function accept(resultId: string) {
     setBusyId(resultId);
@@ -401,6 +402,20 @@ function JobReviewPanel({
     } finally {
       setAddingBarcode(false);
     }
+  }
+
+  // Click a product's barcode → copy it AND fill the box above, ready to re-look-up.
+  function pickBarcode(code: string) {
+    setBarcode(code);
+    setBarcodeMsg(null);
+    setError(null);
+    try {
+      navigator.clipboard?.writeText(code);
+    } catch {
+      /* clipboard may be unavailable; the box is filled regardless */
+    }
+    setCopied(code);
+    window.setTimeout(() => setCopied((c) => (c === code ? null : c)), 1500);
   }
 
   return (
@@ -482,9 +497,14 @@ function JobReviewPanel({
                         <span className="ml-2 text-xs text-neutral-400">{r.categoryGuess}</span>
                       ) : null}
                       {r.barcode ? (
-                        <span className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-500">
-                          {r.barcode}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => pickBarcode(r.barcode!)}
+                          title="Click to copy + fill the barcode box above (re-look-up if the name looks wrong)"
+                          className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-500 hover:bg-brand-50 hover:text-brand-700"
+                        >
+                          {copied === r.barcode ? '✓ copied' : `⧉ ${r.barcode}`}
+                        </button>
                       ) : null}
                     </td>
                     <td className="py-2">
