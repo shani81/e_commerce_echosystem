@@ -11,6 +11,7 @@ import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 import { FrameSamplerService } from '../extraction/frame-sampler.service';
 import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
 import { BarcodeScannerService } from '../extraction/barcode-scanner.service';
+import { BarcodeFinderService } from '../extraction/barcode-finder.service';
 import { BarcodeLookupService } from '../extraction/barcode-lookup.service';
 import { MetricsModule } from '../metrics/metrics.module';
 
@@ -44,6 +45,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     FrameSamplerService,
     SemanticDeduperService,
     BarcodeScannerService,
+    BarcodeFinderService,
     BarcodeLookupService,
   ],
 })
