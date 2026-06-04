@@ -56,6 +56,8 @@ export default function ExtractionPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [mediaId, setMediaId] = React.useState('');
   const [starting, setStarting] = React.useState(false);
+  const [file, setFile] = React.useState<File | null>(null);
+  const [uploading, setUploading] = React.useState(false);
   const [selected, setSelected] = React.useState<JobDetail | null>(null);
 
   const load = React.useCallback(async () => {
@@ -89,6 +91,37 @@ export default function ExtractionPage() {
     }
   }
 
+  // Upload a video → presigned PUT → confirm → start extraction, in one go.
+  async function uploadAndStart() {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    const contentType = file.type || 'application/octet-stream';
+    try {
+      const presign = await apiPost<{ assetId: string; uploadUrl: string }>('/media/uploads', {
+        filename: file.name,
+        contentType,
+        kind: 'VIDEO',
+      });
+      const put = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': contentType },
+      });
+      if (!put.ok) {
+        throw new Error(`Storage upload failed (${put.status}) — check MinIO/S3 CORS for the admin origin.`);
+      }
+      await apiPost(`/media/${presign.assetId}/confirm`, { sizeBytes: file.size });
+      await apiPost('/extractions', { mediaId: presign.assetId });
+      setFile(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function openJob(id: string) {
     setError(null);
     try {
@@ -109,20 +142,38 @@ export default function ExtractionPage() {
 
       <Card variant="outline" padding="md">
         <h3 className="mb-2 text-sm font-semibold text-neutral-900">Start a new extraction</h3>
+
+        {/* Upload a shelf video → AI drafts the catalog. */}
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Media asset ID" htmlFor="mediaId" hint="An uploaded video/photo asset (upload UI coming soon).">
+          <Field label="Shelf video" htmlFor="video" hint="Film your shelves; we sample frames and extract products.">
+            <input
+              id="video"
+              type="file"
+              accept="video/*,image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-80 text-sm text-neutral-700 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-700"
+            />
+          </Field>
+          <Button isLoading={uploading} disabled={!file} onClick={uploadAndStart}>
+            Upload &amp; extract
+          </Button>
+        </div>
+
+        {/* Fallback: start from an already-uploaded media asset id. */}
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs text-neutral-500">or start from an existing media asset id</summary>
+          <div className="mt-2 flex flex-wrap items-end gap-3">
             <Input
-              id="mediaId"
               value={mediaId}
               onChange={(e) => setMediaId(e.target.value)}
               placeholder="media asset id"
               className="w-80"
             />
-          </Field>
-          <Button isLoading={starting} disabled={!mediaId.trim()} onClick={startExtraction}>
-            Start extraction
-          </Button>
-        </div>
+            <Button variant="outline" isLoading={starting} disabled={!mediaId.trim()} onClick={startExtraction}>
+              Start extraction
+            </Button>
+          </div>
+        </details>
       </Card>
 
       {error ? (

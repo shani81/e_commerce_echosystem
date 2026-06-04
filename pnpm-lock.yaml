@@ -257,6 +257,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@aicos/ai-core':
+        specifier: workspace:*
+        version: link:../../packages/ai-core
       '@aicos/db':
         specifier: workspace:*
         version: link:../../packages/db
