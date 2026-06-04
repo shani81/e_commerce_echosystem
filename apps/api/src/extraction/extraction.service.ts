@@ -114,11 +114,27 @@ export class ExtractionService {
             orderBy: { overallConfidence: 'desc' },
             include: { reviewItem: true, product: { select: { id: true, slug: true, status: true } } },
           },
+          frames: {
+            orderBy: { frameIndex: 'asc' },
+            select: { id: true, frameIndex: true, timestampMs: true, blurScore: true, barcode: true },
+          },
         },
       }),
     );
     if (!job) throw new NotFoundException('Extraction job not found');
     return job;
+  }
+
+  /** Delete a job + (cascade) its frames/results/review items. Accepted products
+   * are preserved — their `extractionResultId` link is set null by the FK. */
+  async remove(tenantId: string, id: string): Promise<{ id: string; deleted: true }> {
+    await this.prisma.forTenant(tenantId, async (tx) => {
+      const job = await tx.extractionJob.findFirst({ where: { id, tenantId }, select: { id: true } });
+      if (!job) throw new NotFoundException('Extraction job not found');
+      await tx.extractionJob.delete({ where: { id: job.id } });
+    });
+    this.logger.log(`extraction job ${id} deleted`);
+    return { id, deleted: true };
   }
 
   /** Human gate: accept an extracted result → create a DRAFT product for it. */

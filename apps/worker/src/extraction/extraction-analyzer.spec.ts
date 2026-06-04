@@ -26,14 +26,18 @@ describe('ExtractionAnalyzer', () => {
     const a = new ExtractionAnalyzer(cfg({}));
     expect(a.live).toBe(false);
     const out = await a.analyze([IMG]);
-    expect(out).toHaveLength(3);
-    expect(out[0]?.title).toContain('Cola');
+    expect(out.live).toBe(false);
+    expect(out.products).toHaveLength(3);
+    expect(out.products[0]?.title).toContain('Cola');
+    expect(out.note).toMatch(/no ai model key/i);
   });
 
   it('returns the mock when there are no frames (even with a key)', async () => {
     const a = new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' }));
     expect(a.live).toBe(true);
-    expect(await a.analyze([])).toHaveLength(3);
+    const out = await a.analyze([]);
+    expect(out.products).toHaveLength(3);
+    expect(out.live).toBe(false);
   });
 
   it('parses Gemini vision JSON when key + frames are present', async () => {
@@ -44,10 +48,11 @@ describe('ExtractionAnalyzer', () => {
 
     const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
 
-    expect(out).toHaveLength(1);
-    expect(out[0]?.title).toBe('Tea 250ml');
-    expect(out[0]?.priceCents).toBe(199);
-    expect(out[0]?.overallConfidence).toBeCloseTo(0.88);
+    expect(out.live).toBe(true);
+    expect(out.products).toHaveLength(1);
+    expect(out.products[0]?.title).toBe('Tea 250ml');
+    expect(out.products[0]?.priceCents).toBe(199);
+    expect(out.products[0]?.overallConfidence).toBeCloseTo(0.88);
   });
 
   it('strips code fences around the JSON', async () => {
@@ -55,8 +60,8 @@ describe('ExtractionAnalyzer', () => {
       .fn()
       .mockResolvedValue(geminiOk('```json\n[{"title":"Widget","confidence":0.5}]\n```')) as unknown as typeof fetch;
     const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
-    expect(out[0]?.title).toBe('Widget');
-    expect(out[0]?.priceCents).toBeNull();
+    expect(out.products[0]?.title).toBe('Widget');
+    expect(out.products[0]?.priceCents).toBeNull();
   });
 
   it('falls back to the mock on a vision error', async () => {
@@ -64,7 +69,9 @@ describe('ExtractionAnalyzer', () => {
       .fn()
       .mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' }) as unknown as typeof fetch;
     const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
-    expect(out).toHaveLength(3); // mock
+    expect(out.products).toHaveLength(3); // mock
+    expect(out.live).toBe(false);
+    expect(out.note).toMatch(/AI unavailable/i);
   });
 
   it('dedupes vision products by title (keeps most confident) and orders best-first', async () => {
@@ -78,9 +85,10 @@ describe('ExtractionAnalyzer', () => {
 
     const out = await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG]);
 
-    expect(out.map((p) => p.title)).toEqual(['cola', 'Water']); // deduped, empty dropped, confidence-ordered
-    expect(out[0]?.overallConfidence).toBeCloseTo(0.9);
-    expect(out[0]?.priceCents).toBe(150); // the more-confident instance won
+    expect(out.live).toBe(true);
+    expect(out.products.map((p) => p.title)).toEqual(['cola', 'Water']); // deduped, empty dropped, ordered
+    expect(out.products[0]?.overallConfidence).toBeCloseTo(0.9);
+    expect(out.products[0]?.priceCents).toBe(150); // the more-confident instance won
   });
 });
 

@@ -12,6 +12,15 @@ export interface ExtractedProduct {
   fieldConfidence: Record<string, number>;
 }
 
+/** Analyzer outcome — the products plus whether they came from the live model. */
+export interface AnalyzeResult {
+  products: ExtractedProduct[];
+  /** True only when real model results were used (not the mock fallback). */
+  live: boolean;
+  /** When not live, why the mock was used (surfaced in the review UI). */
+  note?: string;
+}
+
 const EXTRACTION_PROMPT =
   'You are a retail product-catalog extractor. From the shelf image(s), identify each distinct ' +
   'product and return ONLY a JSON array (no prose, no code fences). Each element: ' +
@@ -54,9 +63,12 @@ export class ExtractionAnalyzer {
     return this.hasModelKey;
   }
 
-  async analyze(images: AiImage[]): Promise<ExtractedProduct[]> {
-    if (images.length === 0 || !this.hasModelKey) {
-      return [...MOCK];
+  async analyze(images: AiImage[]): Promise<AnalyzeResult> {
+    if (!this.hasModelKey) {
+      return { products: [...MOCK], live: false, note: 'No AI model key configured — showing sample products.' };
+    }
+    if (images.length === 0) {
+      return { products: [...MOCK], live: false, note: 'No frames to analyze — showing sample products.' };
     }
     try {
       const res = await this.router.vision(
@@ -64,12 +76,14 @@ export class ExtractionAnalyzer {
         { alias: 'extraction.primary' },
       );
       const enriched = enrichProducts(parseProducts(res.text));
-      return enriched.length > 0 ? enriched : [...MOCK];
+      if (enriched.length === 0) {
+        return { products: [...MOCK], live: false, note: 'AI returned no recognizable products — showing sample products.' };
+      }
+      return { products: enriched, live: true };
     } catch (err) {
-      this.logger.warn(
-        `vision analyze failed — using mock: ${err instanceof Error ? err.message : 'unknown'}`,
-      );
-      return [...MOCK];
+      const msg = err instanceof Error ? err.message : 'unknown error';
+      this.logger.warn(`vision analyze failed — using mock: ${msg}`);
+      return { products: [...MOCK], live: false, note: `AI unavailable: ${msg.slice(0, 240)}` };
     }
   }
 }
