@@ -8,6 +8,7 @@ import { DsarProcessor } from './dsar.processor';
 import { QueueMetricsService } from './queue-metrics.service';
 import { MailService } from '../mail/mail.service';
 import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
+import { FrameSamplerService } from '../extraction/frame-sampler.service';
 import { MetricsModule } from '../metrics/metrics.module';
 
 /**
@@ -37,6 +38,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     QueueMetricsService,
     MailService,
     ExtractionAnalyzer,
+    FrameSamplerService,
   ],
 })
 export class QueuesModule {}

@@ -16,6 +16,7 @@ import {
 } from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
+import { FrameSamplerService, type SourceMedia } from '../extraction/frame-sampler.service';
 
 /**
  * Consumer for the `extraction` queue — the flagship AI product-extraction
@@ -24,9 +25,11 @@ import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
  * Real pipeline shape: QUEUED → INGESTING (sample frames) → ANALYZING (vision) →
  * MERGING → AWAITING_REVIEW, persisting ExtractionFrame + ExtractionResult +
  * ExtractionReviewItem so the review UI + accept→draft gate work end-to-end.
- * The analyze step goes through {@link ExtractionAnalyzer} → `@aicos/ai-core`
- * Gemini vision when a key + frames exist, else a deterministic mock. FFmpeg
- * frame sampling (real images to feed vision) is JOB 1, the remaining piece.
+ * INGESTING uses {@link FrameSamplerService} to pull the source media from S3 and
+ * sample real frames with ffmpeg; the analyze step goes through
+ * {@link ExtractionAnalyzer} → `@aicos/ai-core` Gemini vision when a key + frames
+ * exist, else a deterministic mock. When no media is attached or sampling can't
+ * run, it falls back to placeholder frames + the mock so the gate stays testable.
  * Idempotent: a job already AWAITING_REVIEW/PUBLISHED is skipped. No auto-publish.
  */
 @Processor(QUEUE_NAMES.extraction)
@@ -37,6 +40,7 @@ export class ExtractionProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analyzer: ExtractionAnalyzer,
+    private readonly sampler: FrameSamplerService,
   ) {
     super();
   }
@@ -48,8 +52,8 @@ export class ExtractionProcessor extends WorkerHost {
     }
     const { tenantId, extractionRunId } = job.data;
 
-    // tx1 — claim the job + sample frames (mock frames until FFmpeg/JOB 1).
-    const frameIds = await withTenant(this.prisma.client, tenantId, async (tx) => {
+    // tx1 — claim the job, mark INGESTING, and read the source media to sample.
+    const claim = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const j = await tx.extractionJob.findFirst({ where: { id: extractionRunId, tenantId } });
       if (!j) {
         this.logger.warn(`extraction job ${extractionRunId} not found`);
@@ -65,37 +69,75 @@ export class ExtractionProcessor extends WorkerHost {
         where: { id: j.id },
         data: { status: ExtractionJobStatus.INGESTING, startedAt: new Date() },
       });
-      const ids: string[] = [];
-      for (let i = 0; i < ExtractionProcessor.FRAME_COUNT; i++) {
-        const f = await tx.extractionFrame.create({
-          data: { tenantId, jobId: j.id, frameIndex: i, confidence: 0.9, providerUsed: AiProvider.GEMINI },
-          select: { id: true },
+      let media: SourceMedia | null = null;
+      if (j.sourceMediaId) {
+        media = await tx.mediaAsset.findFirst({
+          where: { id: j.sourceMediaId, tenantId },
+          select: { id: true, bucket: true, objectKey: true, mimeType: true, type: true },
         });
-        ids.push(f.id);
+      }
+      return { jobId: j.id, media };
+    });
+
+    if (!claim) {
+      await job.updateProgress(100);
+      return { extractionRunId, productsFound: 0 };
+    }
+
+    // Sample real frames OUTSIDE any tx (S3 download + ffmpeg are slow and must
+    // not hold the RLS-scoped transaction open). Empty result → no media, sampler
+    // unavailable, or a decode error → deterministic-mock fallback below.
+    const sampled = claim.media
+      ? await this.sampler.sample(claim.media, ExtractionProcessor.FRAME_COUNT)
+      : [];
+    const usingRealFrames = sampled.length > 0;
+
+    // tx2 — persist the frames (real or placeholder) and advance to ANALYZING.
+    const frameIds = await withTenant(this.prisma.client, tenantId, async (tx) => {
+      const ids: string[] = [];
+      if (usingRealFrames) {
+        for (const f of sampled) {
+          const row = await tx.extractionFrame.create({
+            data: {
+              tenantId,
+              jobId: claim.jobId,
+              mediaId: claim.media?.id ?? null,
+              frameIndex: f.frameIndex,
+              timestampMs: f.timestampMs,
+              providerUsed: AiProvider.GEMINI,
+            },
+            select: { id: true },
+          });
+          ids.push(row.id);
+        }
+      } else {
+        // No real media (or sampling unavailable) → placeholder frames keep the
+        // pipeline and human-review gate exercisable.
+        for (let i = 0; i < ExtractionProcessor.FRAME_COUNT; i++) {
+          const row = await tx.extractionFrame.create({
+            data: { tenantId, jobId: claim.jobId, frameIndex: i, confidence: 0.9, providerUsed: AiProvider.GEMINI },
+            select: { id: true },
+          });
+          ids.push(row.id);
+        }
       }
       await tx.extractionJob.update({
-        where: { id: j.id },
+        where: { id: claim.jobId },
         data: {
           status: ExtractionJobStatus.ANALYZING,
-          framesExtracted: ExtractionProcessor.FRAME_COUNT,
-          framesAnalyzed: ExtractionProcessor.FRAME_COUNT,
+          framesExtracted: ids.length,
+          framesAnalyzed: ids.length,
         },
       });
       return ids;
     });
 
-    if (!frameIds) {
-      await job.updateProgress(100);
-      return { extractionRunId, productsFound: 0 };
-    }
-
-    // analyze OUTSIDE the tx (may call the vision model). No real frame images
-    // yet (FFmpeg = JOB 1) → analyzer returns the mock; with frames + a key it
-    // routes through ai-core Gemini vision.
-    const images: AiImage[] = [];
+    // analyze OUTSIDE the tx (may call the vision model). Real frame images +
+    // a model key → ai-core Gemini vision; otherwise the deterministic mock.
+    const images: AiImage[] = sampled.map((f) => f.image);
     const products = await this.analyzer.analyze(images);
 
-    // tx2 — persist results + review items; hand to the human review gate.
+    // tx3 — persist results + review items; hand to the human review gate.
     await withTenant(this.prisma.client, tenantId, async (tx) => {
       for (const p of products) {
         const result = await tx.extractionResult.create({
@@ -129,8 +171,10 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     await job.updateProgress(100);
+    const mode = usingRealFrames ? (this.analyzer.live ? 'live vision' : 'mock (no AI key)') : 'mock (no frames)';
     this.logger.log(
-      `extraction ${extractionRunId} → ${products.length} draft results AWAITING_REVIEW (${this.analyzer.live ? 'live' : 'mock'})`,
+      `extraction ${extractionRunId} → ${products.length} draft results AWAITING_REVIEW ` +
+        `(${frameIds.length} frames, ${mode})`,
     );
     return { extractionRunId, productsFound: products.length };
   }
