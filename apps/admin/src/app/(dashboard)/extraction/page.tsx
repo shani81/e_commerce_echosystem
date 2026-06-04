@@ -174,17 +174,20 @@ export default function ExtractionPage() {
     }
   }
 
-  // Upload a video → presigned PUT → confirm → start extraction, in one go.
+  // Upload a video OR product photo → presigned PUT → confirm → start extraction.
   async function uploadAndStart() {
     if (!file) return;
     setUploading(true);
     setError(null);
     const contentType = file.type || 'application/octet-stream';
+    // Tag the asset correctly so the pipeline uses the image pass-through (single
+    // frame) vs. ffmpeg video frame-sampling.
+    const kind = contentType.startsWith('image/') ? 'IMAGE' : 'VIDEO';
     try {
       const presign = await apiPost<{ assetId: string; uploadUrl: string }>('/media/uploads', {
         filename: file.name,
         contentType,
-        kind: 'VIDEO',
+        kind,
       });
       const put = await fetch(presign.uploadUrl, {
         method: 'PUT',
@@ -245,9 +248,13 @@ export default function ExtractionPage() {
       <Card variant="outline" padding="md">
         <h3 className="mb-2 text-sm font-semibold text-neutral-900">Start a new extraction</h3>
 
-        {/* Upload a shelf video → AI drafts the catalog. */}
+        {/* Upload a shelf video OR a product photo → AI drafts the catalog. */}
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Shelf video" htmlFor="video" hint="Film your shelves; we sample frames and extract products.">
+          <Field
+            label="Shelf video or product photo"
+            htmlFor="video"
+            hint="A shelf video (we sample frames) or a single product photo / barcode — we detect the product."
+          >
             <input
               id="video"
               type="file"
@@ -257,9 +264,14 @@ export default function ExtractionPage() {
             />
           </Field>
           <Button isLoading={uploading} disabled={!file} onClick={uploadAndStart}>
-            Upload &amp; extract
+            {file ? (file.type.startsWith('image/') ? 'Upload photo & extract' : 'Upload & extract') : 'Upload & extract'}
           </Button>
         </div>
+        {file ? (
+          <p className="mt-1 text-xs text-neutral-400">
+            Selected: {file.name} ({file.type || 'unknown type'})
+          </p>
+        ) : null}
 
         {/* Fallback: start from an already-uploaded media asset id. */}
         <details className="mt-3">
