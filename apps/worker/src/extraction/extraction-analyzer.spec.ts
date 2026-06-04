@@ -90,6 +90,17 @@ describe('ExtractionAnalyzer', () => {
     expect(out.products[0]?.overallConfidence).toBeCloseTo(0.9);
     expect(out.products[0]?.priceCents).toBe(150); // the more-confident instance won
   });
+
+  it('passes decoded barcodes to the model as hints', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(geminiOk('[{"title":"X","confidence":0.9}]'));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await new ExtractionAnalyzer(cfg({ GEMINI_API_KEY: 'k' })).analyze([IMG], ['5901234123457']);
+
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    const promptText = body.contents[0].parts[0].text as string;
+    expect(promptText).toContain('5901234123457');
+  });
 });
 
 describe('enrichProducts (unit)', () => {
