@@ -5,7 +5,9 @@ import { ExtractionProcessor } from './extraction.processor';
 import { BillingProcessor } from './billing.processor';
 import { NotificationsProcessor } from './notifications.processor';
 import { DsarProcessor } from './dsar.processor';
+import { QueueMetricsService } from './queue-metrics.service';
 import { MailService } from '../mail/mail.service';
+import { MetricsModule } from '../metrics/metrics.module';
 
 /**
  * Registers the worker's BullMQ queues and binds a processor to each.
@@ -18,6 +20,7 @@ import { MailService } from '../mail/mail.service';
  */
 @Module({
   imports: [
+    MetricsModule,
     BullModule.registerQueue(
       { name: QUEUE_NAMES.extraction },
       { name: QUEUE_NAMES.billing },
@@ -30,6 +33,7 @@ import { MailService } from '../mail/mail.service';
     BillingProcessor,
     NotificationsProcessor,
     DsarProcessor,
+    QueueMetricsService,
     MailService,
   ],
 })

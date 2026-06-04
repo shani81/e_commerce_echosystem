@@ -10,6 +10,7 @@ import { AuditAction, DsarStatus, withTenant } from '@aicos/db';
 import { DsarProcessor } from './dsar.processor';
 import { DSAR_JOBS, type DsarJobData } from './contracts';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { MetricsService } from '../metrics/metrics.service';
 
 const wt = withTenant as jest.Mock;
 
@@ -38,7 +39,10 @@ describe('DsarProcessor', () => {
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
     wt.mockImplementation((_c: unknown, _t: string, fn: (tx: Tx) => unknown) => fn(tx));
-    proc = new DsarProcessor({ client: {} } as unknown as PrismaService);
+    proc = new DsarProcessor(
+      { client: {} } as unknown as PrismaService,
+      { dsarProcessed: { inc: jest.fn() } } as unknown as MetricsService,
+    );
   });
 
   it('ERASURE pseudonymizes the customer, audits ERASE, and completes', async () => {

@@ -10,6 +10,7 @@ import {
 } from '@aicos/db';
 import { DSAR_JOBS, QUEUE_NAMES, type DsarJobData } from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 /**
  * Consumer for the `dsar` queue — fulfils GDPR data-subject requests on the
@@ -22,7 +23,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DsarProcessor extends WorkerHost {
   private readonly logger = new Logger(DsarProcessor.name);
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly metrics: MetricsService,
+  ) {
     super();
   }
 
@@ -33,13 +37,13 @@ export class DsarProcessor extends WorkerHost {
     }
     const { tenantId, dsarRequestId } = job.data;
 
-    await withTenant(this.prisma.client, tenantId, async (tx) => {
+    const processedType = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const req = await tx.dsarRequest.findFirst({ where: { id: dsarRequestId } });
       if (!req) {
         this.logger.warn(`dsar request ${dsarRequestId} not found`);
-        return;
+        return null;
       }
-      if (req.status === DsarStatus.COMPLETED || req.status === DsarStatus.REJECTED) return;
+      if (req.status === DsarStatus.COMPLETED || req.status === DsarStatus.REJECTED) return null;
 
       await tx.dsarRequest.update({
         where: { id: req.id },
@@ -73,8 +77,12 @@ export class DsarProcessor extends WorkerHost {
         where: { id: req.id },
         data: { status: DsarStatus.COMPLETED, completedAt: new Date() },
       });
+      return req.type;
     });
 
+    if (processedType) {
+      this.metrics.dsarProcessed.inc({ type: String(processedType).toLowerCase() });
+    }
     this.logger.log(`dsar ${dsarRequestId} processed`);
     return { handled: true };
   }

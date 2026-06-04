@@ -11,6 +11,7 @@ import { NotificationsProcessor } from './notifications.processor';
 import { NOTIFICATION_JOBS, type NotificationJobData } from './contracts';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { MailService } from '../mail/mail.service';
+import type { MetricsService } from '../metrics/metrics.service';
 
 const wt = withTenant as jest.Mock;
 
@@ -34,6 +35,7 @@ describe('NotificationsProcessor', () => {
     proc = new NotificationsProcessor(
       { client: {} } as unknown as PrismaService,
       { send } as unknown as MailService,
+      { notifications: { inc: jest.fn() } } as unknown as MetricsService,
     );
   });
 

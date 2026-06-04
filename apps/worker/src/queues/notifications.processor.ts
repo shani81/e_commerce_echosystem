@@ -5,6 +5,7 @@ import { NotificationStatus, withTenant } from '@aicos/db';
 import { NOTIFICATION_JOBS, QUEUE_NAMES, type NotificationJobData } from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { renderTemplate } from '../mail/templates';
 
 /**
@@ -21,6 +22,7 @@ export class NotificationsProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly metrics: MetricsService,
   ) {
     super();
   }
@@ -49,6 +51,7 @@ export class NotificationsProcessor extends WorkerHost {
           data: { status: NotificationStatus.FAILED, failureReason: 'no destination address' },
         }),
       );
+      this.metrics.notifications.inc({ status: 'failed' });
       return { handled: true };
     }
 
@@ -66,6 +69,7 @@ export class NotificationsProcessor extends WorkerHost {
           },
         }),
       );
+      this.metrics.notifications.inc({ status: 'sent' });
       this.logger.log(`notification ${n.id} (${n.template}) → ${n.toAddress}`);
       return { handled: true };
     } catch (err) {
@@ -76,6 +80,7 @@ export class NotificationsProcessor extends WorkerHost {
           data: { status: NotificationStatus.FAILED, failureReason: reason },
         }),
       );
+      this.metrics.notifications.inc({ status: 'failed' });
       throw err; // let BullMQ retry
     }
   }

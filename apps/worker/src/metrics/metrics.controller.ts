@@ -1,23 +1,18 @@
-import { Controller, Get, Header, type OnModuleInit } from '@nestjs/common';
-import { collectDefaultMetrics, Registry } from 'prom-client';
+import { Controller, Get, Header } from '@nestjs/common';
+import { MetricsService } from './metrics.service';
 
 /**
  * Prometheus scrape endpoint for the worker (`GET /metrics` on the worker port).
- * Exposes default Node/process metrics — CPU, memory, event-loop lag, GC — so an
- * orchestrator can watch worker health beyond the liveness probe.
+ * Renders the shared {@link MetricsService} registry — default Node/process
+ * metrics plus AICOS queue-depth gauges + lifecycle counters.
  */
 @Controller('metrics')
-export class MetricsController implements OnModuleInit {
-  private readonly registry = new Registry();
-
-  onModuleInit(): void {
-    this.registry.setDefaultLabels({ app: 'aicos-worker' });
-    collectDefaultMetrics({ register: this.registry });
-  }
+export class MetricsController {
+  constructor(private readonly metrics: MetricsService) {}
 
   @Get()
   @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
   scrape(): Promise<string> {
-    return this.registry.metrics();
+    return this.metrics.render();
   }
 }

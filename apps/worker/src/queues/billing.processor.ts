@@ -21,6 +21,7 @@ import {
 } from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 // --- Minimal local shapes for the Stripe event objects we read. The worker has
 // no `stripe` dependency; the verified event arrives as JSON in the job payload,
@@ -93,6 +94,7 @@ export class BillingProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly metrics: MetricsService,
     @InjectQueue(QUEUE_NAMES.notifications) private readonly notifyQueue: Queue,
   ) {
     super();
@@ -211,6 +213,8 @@ export class BillingProcessor extends WorkerHost {
       this.logger.log(`order ${order.number} → PAID (${paidAmount} ${order.currency})`);
       return { email: order.email, number: order.number, total: paidAmount, currency: order.currency };
     });
+
+    if (confirm) this.metrics.ordersPaid.inc();
 
     // Order-confirmation email (best-effort): persist a Notification row + enqueue.
     if (confirm?.email) {
