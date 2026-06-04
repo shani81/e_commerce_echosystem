@@ -113,14 +113,6 @@ export class ExtractionProcessor extends WorkerHost {
     );
     const barcodeHints = [...new Set(barcodes.filter((b): b is string => Boolean(b)))];
 
-    // Resolve barcodes to real products via open product DBs — so a shelf of
-    // barcodes yields catalog drafts with or without vision.
-    const barcodeProducts = barcodeHints.length
-      ? (await Promise.all(barcodeHints.map((b) => this.barcodeLookup.lookup(b)))).filter(
-          (p): p is ExtractedProduct => Boolean(p),
-        )
-      : [];
-
     // Upload each frame JPEG to object storage (best-effort) so the review UI can
     // show thumbnails. objectKey per frame, or null when upload is unavailable.
     const frameBucket = this.sampler.uploadBucket;
@@ -201,14 +193,36 @@ export class ExtractionProcessor extends WorkerHost {
     // the fallback reason (e.g. quota/HTTP error) for the review UI.
     const images: AiImage[] = sampled.map((f) => f.image);
     const analysis = await this.analyzer.analyze(images, barcodeHints);
+    const visionProducts = analysis.live ? analysis.products : [];
 
-    // Merge real sources — barcode lookups (exact GTIN) + live vision, deduped &
-    // confidence-ordered. Only fall back to the deterministic mock when NEITHER
-    // produced anything (so barcodes alone still give real results).
-    const haveReal = analysis.live || barcodeProducts.length > 0;
-    const products = haveReal
-      ? enrichProducts([...barcodeProducts, ...(analysis.live ? analysis.products : [])])
-      : analysis.products;
+    // The GTIN is authoritative: look up EVERY barcode we have — decoded by ZXing
+    // AND read by the vision model — and let the lookup OVERRIDE the model's
+    // guessed name/brand (and supply the product image). This fixes "right
+    // barcode, wrong product name".
+    const allBarcodes = [
+      ...new Set([
+        ...barcodeHints,
+        ...visionProducts.map((p) => p.barcode).filter((b): b is string => Boolean(b)),
+      ]),
+    ];
+    const lookupByBarcode = new Map<string, ExtractedProduct>();
+    for (const code of allBarcodes) {
+      const looked = await this.barcodeLookup.lookup(code);
+      if (looked) lookupByBarcode.set(code, looked);
+    }
+    // Replace a vision product with the authoritative lookup when its barcode resolved.
+    const corrected = visionProducts.map((p) =>
+      p.barcode && lookupByBarcode.has(p.barcode) ? lookupByBarcode.get(p.barcode)! : p,
+    );
+    // Lookups for barcodes not tied to any vision product (e.g. ZXing-only reads).
+    const matched = new Set(visionProducts.map((p) => p.barcode).filter(Boolean));
+    const standalone = [...lookupByBarcode].filter(([c]) => !matched.has(c)).map(([, prod]) => prod);
+
+    // Real products from vision (barcode-corrected) + standalone lookups; mock only
+    // when neither produced anything.
+    const realProducts = [...standalone, ...corrected];
+    const haveReal = realProducts.length > 0;
+    const products = haveReal ? enrichProducts(realProducts) : analysis.products;
     const note = haveReal ? null : analysis.note;
 
     // Grab canonical product images (from barcode lookups) into storage OUTSIDE
@@ -284,7 +298,7 @@ export class ExtractionProcessor extends WorkerHost {
     const sources =
       [
         analysis.live ? 'vision' : null,
-        barcodeProducts.length ? `${barcodeProducts.length} barcode` : null,
+        lookupByBarcode.size ? `${lookupByBarcode.size} barcode` : null,
       ]
         .filter(Boolean)
         .join('+') || `mock (${analysis.note ?? 'fallback'})`;
