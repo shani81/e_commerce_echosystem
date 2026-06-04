@@ -104,6 +104,7 @@ export class ExtractionProcessor extends WorkerHost {
               mediaId: claim.media?.id ?? null,
               frameIndex: f.frameIndex,
               timestampMs: f.timestampMs,
+              blurScore: f.blurScore,
               providerUsed: AiProvider.GEMINI,
             },
             select: { id: true },
