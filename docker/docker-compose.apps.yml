@@ -1,0 +1,58 @@
+# AICOS app services — built from source, run alongside the infra compose.
+# Merge with the infra file so apps share its network + reach services by name:
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.apps.yml --env-file .env up -d --build
+# (See .ai/runbooks/deployment.md for first-run migrations + JWT keys.)
+name: aicos
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: aicos-api
+    restart: unless-stopped
+    depends_on: [postgres, redis]
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aicos}:${POSTGRES_PASSWORD:-aicos_dev_2026}@postgres:5432/${POSTGRES_DB:-aicos}?schema=public
+      APP_DATABASE_URL: postgresql://aicos_app:aicos_app_dev_2026@postgres:5432/${POSTGRES_DB:-aicos}?schema=public
+      REDIS_URL: redis://redis:6379
+      MEILI_HOST: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-aicos_dev_meili_master_2026}
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-aicos-media}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_dev_2026}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      MAIL_FROM: ${MAIL_FROM:-no-reply@aicos.local}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3100}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh_secret}
+      # RS256 keypair — supply base64/PEM via env in real deploys (the .keys dir is
+      # not baked into the image). For local container runs, mount it (below).
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+    volumes:
+      - ../.keys:/repo/.keys:ro # dev convenience; prod injects keys via env/secret
+    ports:
+      - "4000:4000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    container_name: aicos-worker
+    restart: unless-stopped
+    depends_on: [postgres, redis]
+    environment:
+      NODE_ENV: production
+      WORKER_PORT: 4100
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aicos}:${POSTGRES_PASSWORD:-aicos_dev_2026}@postgres:5432/${POSTGRES_DB:-aicos}?schema=public
+      APP_DATABASE_URL: postgresql://aicos_app:aicos_app_dev_2026@postgres:5432/${POSTGRES_DB:-aicos}?schema=public
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      MAIL_FROM: ${MAIL_FROM:-no-reply@aicos.local}
+    ports:
+      - "4100:4100"
