@@ -17,10 +17,15 @@ import {
   type ExtractionJobData,
 } from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
-import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
+import {
+  ExtractionAnalyzer,
+  enrichProducts,
+  type ExtractedProduct,
+} from '../extraction/extraction-analyzer.service';
 import { FrameSamplerService, type SourceMedia } from '../extraction/frame-sampler.service';
 import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
 import { BarcodeScannerService } from '../extraction/barcode-scanner.service';
+import { BarcodeLookupService } from '../extraction/barcode-lookup.service';
 
 /**
  * Consumer for the `extraction` queue — the flagship AI product-extraction
@@ -47,6 +52,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly sampler: FrameSamplerService,
     private readonly semanticDeduper: SemanticDeduperService,
     private readonly barcodeScanner: BarcodeScannerService,
+    private readonly barcodeLookup: BarcodeLookupService,
   ) {
     super();
   }
@@ -106,6 +112,14 @@ export class ExtractionProcessor extends WorkerHost {
       this.barcodeScanner.scan(Buffer.from(f.image.base64 ?? '', 'base64')),
     );
     const barcodeHints = [...new Set(barcodes.filter((b): b is string => Boolean(b)))];
+
+    // Resolve barcodes to real products via open product DBs — so a shelf of
+    // barcodes yields catalog drafts with or without vision.
+    const barcodeProducts = barcodeHints.length
+      ? (await Promise.all(barcodeHints.map((b) => this.barcodeLookup.lookup(b)))).filter(
+          (p): p is ExtractedProduct => Boolean(p),
+        )
+      : [];
 
     // Upload each frame JPEG to object storage (best-effort) so the review UI can
     // show thumbnails. objectKey per frame, or null when upload is unavailable.
@@ -187,7 +201,15 @@ export class ExtractionProcessor extends WorkerHost {
     // the fallback reason (e.g. quota/HTTP error) for the review UI.
     const images: AiImage[] = sampled.map((f) => f.image);
     const analysis = await this.analyzer.analyze(images, barcodeHints);
-    const products = analysis.products;
+
+    // Merge real sources — barcode lookups (exact GTIN) + live vision, deduped &
+    // confidence-ordered. Only fall back to the deterministic mock when NEITHER
+    // produced anything (so barcodes alone still give real results).
+    const haveReal = analysis.live || barcodeProducts.length > 0;
+    const products = haveReal
+      ? enrichProducts([...barcodeProducts, ...(analysis.live ? analysis.products : [])])
+      : analysis.products;
+    const note = haveReal ? null : analysis.note;
 
     // tx3 — persist results + review items; hand to the human review gate.
     await withTenant(this.prisma.client, tenantId, async (tx) => {
@@ -218,18 +240,25 @@ export class ExtractionProcessor extends WorkerHost {
           status: ExtractionJobStatus.AWAITING_REVIEW,
           productsFound: products.length,
           completedAt: new Date(),
-          // Surface the fallback reason (quota/HTTP error/no-key) to the UI;
-          // cleared when real AI results were used.
-          errorMessage: analysis.live ? null : analysis.note ?? null,
+          // Surface the fallback reason (quota/HTTP error/no-key) only when the
+          // results are the mock; cleared when vision or barcode lookup produced
+          // real products.
+          errorMessage: note,
         },
       });
     });
 
     await job.updateProgress(100);
-    const mode = analysis.live ? 'live vision' : `mock (${analysis.note ?? 'fallback'})`;
+    const sources =
+      [
+        analysis.live ? 'vision' : null,
+        barcodeProducts.length ? `${barcodeProducts.length} barcode` : null,
+      ]
+        .filter(Boolean)
+        .join('+') || `mock (${analysis.note ?? 'fallback'})`;
     this.logger.log(
       `extraction ${extractionRunId} → ${products.length} draft results AWAITING_REVIEW ` +
-        `(${frameIds.length} frames, ${mode})`,
+        `(${frameIds.length} frames, ${sources})`,
     );
     return { extractionRunId, productsFound: products.length };
   }
