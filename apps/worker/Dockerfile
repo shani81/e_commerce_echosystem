@@ -21,8 +21,9 @@ RUN pnpm install --frozen-lockfile \
 # a documented follow-up — see .ai/runbooks/deployment.md.
 FROM build AS runtime
 ENV NODE_ENV=production
-# Use the distro ffmpeg (apk) for frame sampling on alpine.
+# Use the distro ffmpeg/ffprobe (apk) for frame sampling on alpine.
 ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV FFPROBE_PATH=/usr/bin/ffprobe
 WORKDIR /repo/apps/worker
 EXPOSE 4100
 CMD ["node", "dist/main.js"]
