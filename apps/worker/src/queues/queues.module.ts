@@ -7,6 +7,7 @@ import { NotificationsProcessor } from './notifications.processor';
 import { DsarProcessor } from './dsar.processor';
 import { QueueMetricsService } from './queue-metrics.service';
 import { MailService } from '../mail/mail.service';
+import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 import { MetricsModule } from '../metrics/metrics.module';
 
 /**
@@ -35,6 +36,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     DsarProcessor,
     QueueMetricsService,
     MailService,
+    ExtractionAnalyzer,
   ],
 })
 export class QueuesModule {}

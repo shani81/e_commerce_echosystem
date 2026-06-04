@@ -8,34 +8,36 @@ import {
   withTenant,
   type Prisma,
 } from '@aicos/db';
+import type { AiImage } from '@aicos/ai-core';
 import {
   EXTRACTION_JOBS,
   QUEUE_NAMES,
   type ExtractionJobData,
 } from './contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 
 /**
  * Consumer for the `extraction` queue — the flagship AI product-extraction
  * pipeline (see `.ai/features/ai-product-extraction/architecture.md`).
  *
- * KICKOFF: this runs the real *shape* of the pipeline against the real models —
- * QUEUED → INGESTING (sample frames) → ANALYZING (vision) → MERGING →
- * AWAITING_REVIEW, persisting ExtractionFrame + ExtractionResult +
- * ExtractionReviewItem rows so the review UI + the accept→draft-product gate work
- * end-to-end. The `analyze` step is a deterministic MOCK; the real implementation
- * samples frames with FFmpeg and routes them through `@aicos/ai-core`
- * (`extraction.primary` → Gemini vision, Claude fallback) — that swap is the only
- * change needed to go live (decisions XT-01..XT-08). Nothing auto-publishes.
- *
- * Idempotent: a job already AWAITING_REVIEW/PUBLISHED is skipped.
+ * Real pipeline shape: QUEUED → INGESTING (sample frames) → ANALYZING (vision) →
+ * MERGING → AWAITING_REVIEW, persisting ExtractionFrame + ExtractionResult +
+ * ExtractionReviewItem so the review UI + accept→draft gate work end-to-end.
+ * The analyze step goes through {@link ExtractionAnalyzer} → `@aicos/ai-core`
+ * Gemini vision when a key + frames exist, else a deterministic mock. FFmpeg
+ * frame sampling (real images to feed vision) is JOB 1, the remaining piece.
+ * Idempotent: a job already AWAITING_REVIEW/PUBLISHED is skipped. No auto-publish.
  */
 @Processor(QUEUE_NAMES.extraction)
 export class ExtractionProcessor extends WorkerHost {
   private readonly logger = new Logger(ExtractionProcessor.name);
   private static readonly FRAME_COUNT = 6;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analyzer: ExtractionAnalyzer,
+  ) {
     super();
   }
 
@@ -46,7 +48,8 @@ export class ExtractionProcessor extends WorkerHost {
     }
     const { tenantId, extractionRunId } = job.data;
 
-    const outcome = await withTenant(this.prisma.client, tenantId, async (tx) => {
+    // tx1 — claim the job + sample frames (mock frames until FFmpeg/JOB 1).
+    const frameIds = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const j = await tx.extractionJob.findFirst({ where: { id: extractionRunId, tenantId } });
       if (!j) {
         this.logger.warn(`extraction job ${extractionRunId} not found`);
@@ -58,26 +61,17 @@ export class ExtractionProcessor extends WorkerHost {
       ) {
         return null; // already processed
       }
-
       await tx.extractionJob.update({
         where: { id: j.id },
         data: { status: ExtractionJobStatus.INGESTING, startedAt: new Date() },
       });
-
-      // --- sample (MOCK frames; real: FFmpeg sampling + pHash dedup) ---
-      const frameIds: string[] = [];
+      const ids: string[] = [];
       for (let i = 0; i < ExtractionProcessor.FRAME_COUNT; i++) {
         const f = await tx.extractionFrame.create({
-          data: {
-            tenantId,
-            jobId: j.id,
-            frameIndex: i,
-            confidence: 0.9,
-            providerUsed: AiProvider.GEMINI,
-          },
+          data: { tenantId, jobId: j.id, frameIndex: i, confidence: 0.9, providerUsed: AiProvider.GEMINI },
           select: { id: true },
         });
-        frameIds.push(f.id);
+        ids.push(f.id);
       }
       await tx.extractionJob.update({
         where: { id: j.id },
@@ -87,13 +81,27 @@ export class ExtractionProcessor extends WorkerHost {
           framesAnalyzed: ExtractionProcessor.FRAME_COUNT,
         },
       });
+      return ids;
+    });
 
-      // --- analyze (MOCK; real: ai-core vision over frame batches) ---
-      for (const p of MOCK_PRODUCTS) {
+    if (!frameIds) {
+      await job.updateProgress(100);
+      return { extractionRunId, productsFound: 0 };
+    }
+
+    // analyze OUTSIDE the tx (may call the vision model). No real frame images
+    // yet (FFmpeg = JOB 1) → analyzer returns the mock; with frames + a key it
+    // routes through ai-core Gemini vision.
+    const images: AiImage[] = [];
+    const products = await this.analyzer.analyze(images);
+
+    // tx2 — persist results + review items; hand to the human review gate.
+    await withTenant(this.prisma.client, tenantId, async (tx) => {
+      for (const p of products) {
         const result = await tx.extractionResult.create({
           data: {
             tenantId,
-            jobId: j.id,
+            jobId: extractionRunId,
             title: p.title,
             priceCents: p.priceCents,
             currency: 'USD',
@@ -107,45 +115,23 @@ export class ExtractionProcessor extends WorkerHost {
           select: { id: true },
         });
         await tx.extractionReviewItem.create({
-          data: { tenantId, jobId: j.id, resultId: result.id, decision: ReviewDecision.PENDING },
+          data: { tenantId, jobId: extractionRunId, resultId: result.id, decision: ReviewDecision.PENDING },
         });
       }
-
-      // --- merge + hand to the human review gate ---
       await tx.extractionJob.update({
-        where: { id: j.id },
+        where: { id: extractionRunId },
         data: {
           status: ExtractionJobStatus.AWAITING_REVIEW,
-          productsFound: MOCK_PRODUCTS.length,
+          productsFound: products.length,
           completedAt: new Date(),
         },
       });
-      return { productsFound: MOCK_PRODUCTS.length };
     });
 
     await job.updateProgress(100);
-    const found = outcome?.productsFound ?? 0;
-    this.logger.log(`extraction ${extractionRunId} → ${found} draft results AWAITING_REVIEW`);
-    return { extractionRunId, productsFound: found };
+    this.logger.log(
+      `extraction ${extractionRunId} → ${products.length} draft results AWAITING_REVIEW (${this.analyzer.live ? 'live' : 'mock'})`,
+    );
+    return { extractionRunId, productsFound: products.length };
   }
 }
-
-interface MockProduct {
-  title: string;
-  priceCents: number;
-  brandGuess: string;
-  categoryGuess: string;
-  overallConfidence: number;
-  fieldConfidence: Record<string, number>;
-}
-
-/**
- * Deterministic stand-in for the vision model's output (one entry per detected
- * product, with per-field confidence driving the review UI's triage bands). The
- * real pipeline replaces this with `@aicos/ai-core` vision calls over the frames.
- */
-const MOCK_PRODUCTS: readonly MockProduct[] = [
-  { title: 'Cola Classic 330ml', priceCents: 149, brandGuess: 'Acme Beverages', categoryGuess: 'Drinks', overallConfidence: 0.92, fieldConfidence: { title: 0.95, price: 0.9, brand: 0.8 } },
-  { title: 'Sparkling Water 500ml', priceCents: 99, brandGuess: 'Acme Beverages', categoryGuess: 'Drinks', overallConfidence: 0.78, fieldConfidence: { title: 0.85, price: 0.7, brand: 0.6 } },
-  { title: 'Energy Bar Peanut', priceCents: 249, brandGuess: 'NutriCo', categoryGuess: 'Snacks', overallConfidence: 0.61, fieldConfidence: { title: 0.8, price: 0.5, brand: 0.55 } },
-];

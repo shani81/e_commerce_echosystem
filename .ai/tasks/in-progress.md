@@ -19,7 +19,9 @@
 |------|--------|-------|
 | Extraction loop (vertical slice) | ✅ Kicked off | API `ExtractionModule` (`/extractions` create/list/get + **accept→DRAFT product** human gate, RBAC `extraction:*`); worker pipeline shape `QUEUED→INGESTING→ANALYZING→MERGING→AWAITING_REVIEW` persisting Frame/Result/ReviewItem; **mock analyzer** (3 products, per-field confidence) is the single swap-point for live AI. Verified — kickoff smoke 9/9. Plan + roadmap: `.ai/features/ai-product-extraction/kickoff.md`. |
 | Admin review UI | ✅ Done | `/extraction` — jobs list + start-from-mediaId + inline **triage-band result grid** (confidence → High/Good/Review/Low) with **accept→DRAFT product**; 'AI Extraction' nav activated. Build green. |
-| Live AI (Gemini vision, FFmpeg, YOLO/ZXing, CLIP dedup, enrich) | 🟦 Next | Drop-in per the roadmap — no schema/contract changes. Implement `@aicos/ai-core` Gemini `vision()` first; add a media-upload UI; capture `order.shippingAddress` for Shippo. |
+| Media upload UI | ✅ Done | `/extraction` uploads a shelf video → presigned PUT → confirm → starts extraction in one click (MinIO/S3; manual media-id fallback kept). |
+| Gemini vision (live-ready) | ✅ Implemented | `@aicos/ai-core` `GeminiProvider.vision()` calls the Generative Language REST API (gated on `GEMINI_API_KEY`, router fallback otherwise). Worker `ExtractionAnalyzer` routes frames through `extraction.primary` → Gemini, parses JSON products, **falls back to the mock** on no-key/no-frames/error. Unit-tested (vision parse, fences, error→mock); extraction smoke 6/6 intact. |
+| Live AI remaining | 🟦 Next | **FFmpeg frame sampling (JOB 1)** to feed real images to the (already-wired) vision call; then refine/CLIP-dedup/enrich. Also: media-upload needs MinIO/S3 browser CORS; capture `order.shippingAddress` for Shippo. |
 
 ## Phase 1 milestones (✅ complete — see `.ai/architecture/reviews/p1-exit-review.md`)
 
