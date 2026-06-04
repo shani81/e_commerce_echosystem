@@ -81,7 +81,7 @@ describe('frame-sampler helpers', () => {
     expect(args.filter((a) => a === '-vf')).toHaveLength(3);
     expect(args.filter((a) => a === '-frames:v')).toHaveLength(3);
     const joined = args.join(' ');
-    expect(joined).toContain('fps=1.5,scale=768:-2');
+    expect(joined).toContain('fps=1.5,scale=1024:-2');
     expect(joined).toContain('fps=1.5,scale=9:8,format=gray');
     expect(joined).toContain('fps=1.5,scale=64:64,format=gray');
   });

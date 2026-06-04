@@ -100,6 +100,9 @@ describe('ExtractionAnalyzer', () => {
     const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     const promptText = body.contents[0].parts[0].text as string;
     expect(promptText).toContain('5901234123457');
+    // Thinking disabled + headroom so 2.5-flash returns clean, untruncated JSON.
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(body.generationConfig.maxOutputTokens).toBe(4096);
   });
 
   it('parses a vision-read barcode (and rejects non-codes)', async () => {
