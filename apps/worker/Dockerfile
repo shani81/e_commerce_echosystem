@@ -7,8 +7,10 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /repo
 
 FROM base AS build
-# openssl is needed by Prisma's query engine at generate/runtime on alpine.
-RUN apk add --no-cache openssl
+# openssl: Prisma's query engine (generate/runtime). ffmpeg: extraction frame
+# sampling — the glibc ffmpeg-static binary can't run on musl/alpine, so we use
+# the distro build and point FFMPEG_PATH at it (see FrameSamplerService).
+RUN apk add --no-cache openssl ffmpeg
 COPY . .
 RUN pnpm install --frozen-lockfile \
  && pnpm --filter @aicos/db run generate \
@@ -19,6 +21,8 @@ RUN pnpm install --frozen-lockfile \
 # a documented follow-up — see .ai/runbooks/deployment.md.
 FROM build AS runtime
 ENV NODE_ENV=production
+# Use the distro ffmpeg (apk) for frame sampling on alpine.
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
 WORKDIR /repo/apps/worker
 EXPOSE 4100
 CMD ["node", "dist/main.js"]
