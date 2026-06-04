@@ -20,6 +20,7 @@ import {
   type Prisma,
 } from '@aicos/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { S3Service } from '../media/s3.service';
 import type { PaginatedResult, PaginationDto } from '../common/dto/pagination.dto';
 import type { CreateExtractionDto } from './dto/create-extraction.dto';
 
@@ -36,6 +37,7 @@ export class ExtractionService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly s3: S3Service,
     @InjectQueue(QUEUE_NAMES.extraction) private readonly queue: Queue,
   ) {}
 
@@ -116,13 +118,32 @@ export class ExtractionService {
           },
           frames: {
             orderBy: { frameIndex: 'asc' },
-            select: { id: true, frameIndex: true, timestampMs: true, blurScore: true, barcode: true },
+            select: {
+              id: true,
+              frameIndex: true,
+              timestampMs: true,
+              blurScore: true,
+              barcode: true,
+              media: { select: { objectKey: true } },
+            },
           },
         },
       }),
     );
     if (!job) throw new NotFoundException('Extraction job not found');
-    return job;
+
+    // Attach a short-lived presigned GET url per frame so the review UI can show
+    // thumbnails (storage unconfigured / presign failure → null, never throws).
+    const frames = await Promise.all(
+      job.frames.map(async ({ media, ...f }) => ({
+        ...f,
+        thumbnailUrl:
+          media?.objectKey && this.s3.isConfigured
+            ? await this.s3.presignDownload(media.objectKey).catch(() => null)
+            : null,
+      })),
+    );
+    return { ...job, frames };
   }
 
   /** Delete a job + (cascade) its frames/results/review items. Accepted products
