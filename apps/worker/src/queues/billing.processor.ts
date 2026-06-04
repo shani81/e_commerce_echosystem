@@ -30,6 +30,20 @@ interface StripeEventEnvelope {
   type: string;
   data: { object: Record<string, unknown> };
 }
+interface StripeAddress {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+}
+interface StripeContactDetails {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: StripeAddress | null;
+}
 interface CheckoutSessionObj {
   id: string;
   payment_intent: string | null;
@@ -37,6 +51,12 @@ interface CheckoutSessionObj {
   currency: string | null;
   metadata: Record<string, string> | null;
   total_details?: { amount_tax?: number | null } | null;
+  // Buyer address/contact collected by Checkout. `shipping_details` is the
+  // collected shipping address; newer API versions also nest it under
+  // `collected_information`. `customer_details` carries billing + email.
+  shipping_details?: StripeContactDetails | null;
+  collected_information?: { shipping_details?: StripeContactDetails | null } | null;
+  customer_details?: StripeContactDetails | null;
 }
 interface PaymentIntentObj {
   id: string;
@@ -156,6 +176,15 @@ export class BillingProcessor extends WorkerHost {
     const amountTax = session.total_details?.amount_tax ?? 0;
     const cartToken = session.metadata?.cartToken;
 
+    // Capture the buyer's address/contact from Checkout so live Shippo has a
+    // ship-to (and the order keeps a billing snapshot + email). Stored in the
+    // shape ShippingService.toAddress() reads.
+    const shippingContact =
+      session.shipping_details ?? session.collected_information?.shipping_details ?? null;
+    const shippingSnapshot = toAddressSnapshot(shippingContact);
+    const billingSnapshot = toAddressSnapshot(session.customer_details);
+    const buyerEmail = session.customer_details?.email ?? null;
+
     const confirm = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, tenantId },
@@ -180,6 +209,9 @@ export class BillingProcessor extends WorkerHost {
           taxCents: amountTax,
           totalCents: paidAmount,
           ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
+          ...(shippingSnapshot ? { shippingAddress: shippingSnapshot } : {}),
+          ...(billingSnapshot && !order.billingAddress ? { billingAddress: billingSnapshot } : {}),
+          ...(buyerEmail && !order.email ? { email: buyerEmail } : {}),
         },
       });
 
@@ -211,7 +243,12 @@ export class BillingProcessor extends WorkerHost {
       }
 
       this.logger.log(`order ${order.number} → PAID (${paidAmount} ${order.currency})`);
-      return { email: order.email, number: order.number, total: paidAmount, currency: order.currency };
+      return {
+        email: order.email ?? buyerEmail,
+        number: order.number,
+        total: paidAmount,
+        currency: order.currency,
+      };
     });
 
     if (confirm) this.metrics.ordersPaid.inc();
@@ -421,4 +458,25 @@ export class BillingProcessor extends WorkerHost {
     );
     this.logger.log(`connect account ${account.id} synced (charges=${account.charges_enabled})`);
   }
+}
+
+/**
+ * Normalize a Stripe contact (shipping_details / customer_details) into the
+ * Order address JSON snapshot — the key shape `ShippingService.toAddress()`
+ * reads (`line1/line2/city/state/postalCode/country/name/phone`). Returns null
+ * when there's no usable street/city/postal info.
+ */
+function toAddressSnapshot(contact?: StripeContactDetails | null): Prisma.InputJsonValue | null {
+  const a = contact?.address;
+  if (!a || (!a.line1 && !a.city && !a.postal_code)) return null;
+  return {
+    name: contact?.name ?? null,
+    phone: contact?.phone ?? null,
+    line1: a.line1 ?? null,
+    line2: a.line2 ?? null,
+    city: a.city ?? null,
+    state: a.state ?? null,
+    postalCode: a.postal_code ?? null,
+    country: a.country ?? null,
+  };
 }

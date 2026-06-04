@@ -238,6 +238,13 @@ export class CheckoutService {
       })),
       success_url: `${successUrl}?order=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${cancelUrl}?order=${order.id}`,
+      // Collect the buyer's shipping address so the webhook can persist it onto
+      // the order (drives Shippo label purchase). Stripe needs an explicit
+      // country allow-list.
+      shipping_address_collection: {
+        allowed_countries: (this.config.get<string[]>('commerce.shippingCountries') ?? ['US']) as
+          Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[],
+      },
       metadata,
       payment_intent_data: {
         metadata,

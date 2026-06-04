@@ -63,6 +63,11 @@ export const envSchema = z.object({
     .string()
     .url()
     .default('http://localhost:3000/checkout/cancel'),
+  // Countries Stripe Checkout collects a shipping address for (comma-separated
+  // ISO-3166-1 alpha-2). Stripe requires an explicit list (no "all").
+  CHECKOUT_SHIPPING_COUNTRIES: z
+    .string()
+    .default('US,CA,GB,AU,DE,FR,ES,IT,NL,IE,NZ,SE,NO,DK,FI,BE,AT,CH,PT,PL'),
   // Where Stripe Connect onboarding (AccountLink) returns the tenant owner — the
   // admin app's payments settings. `refresh` is hit if the link expires.
   CONNECT_REFRESH_URL: z
@@ -212,6 +217,9 @@ export function configuration() {
       checkoutCancelUrl: env.CHECKOUT_CANCEL_URL,
       connectRefreshUrl: env.CONNECT_REFRESH_URL,
       connectReturnUrl: env.CONNECT_RETURN_URL,
+      shippingCountries: env.CHECKOUT_SHIPPING_COUNTRIES.split(',')
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean),
     },
     s3: {
       endpoint: env.S3_ENDPOINT,
