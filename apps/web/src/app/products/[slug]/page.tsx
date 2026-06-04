@@ -77,11 +77,22 @@ export default function ProductPage() {
           </div>
         ) : !product ? null : (
           <div className="grid gap-8 md:grid-cols-2">
-            <div className="flex aspect-square items-center justify-center rounded-2xl bg-neutral-100 text-neutral-300">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="h-20 w-20">
-                <path d="M3 9l9-6 9 6v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V9z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
+            {(() => {
+              const img = product.images.find((i) => i.url);
+              return img?.url ? (
+                <img
+                  src={img.url}
+                  alt={img.altText ?? product.title}
+                  className="aspect-square w-full rounded-2xl border border-neutral-200 bg-white object-contain"
+                />
+              ) : (
+                <div className="flex aspect-square items-center justify-center rounded-2xl bg-neutral-100 text-neutral-300">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="h-20 w-20">
+                    <path d="M3 9l9-6 9 6v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V9z" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              );
+            })()}
             <div>
               {product.brand ? (
                 <Badge variant="neutral" size="sm" className="mb-2">

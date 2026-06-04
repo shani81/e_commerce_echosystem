@@ -36,7 +36,7 @@ export interface ProductDetail {
   description: string | null;
   brand: { name: string } | null;
   variants: VariantLite[];
-  images: { id: string; altText: string | null }[];
+  images: { id: string; altText: string | null; isPrimary: boolean; url: string | null }[];
 }
 
 // --- Cart -------------------------------------------------------------------

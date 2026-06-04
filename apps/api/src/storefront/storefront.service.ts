@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ProductStatus, StoreStatus } from '@aicos/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { S3Service } from '../media/s3.service';
 import { MeiliService, type ProductDoc } from '../search/meili.service';
 
 export interface ProductCard {
@@ -32,6 +33,7 @@ export class StorefrontService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly meili: MeiliService,
+    private readonly s3: S3Service,
   ) {}
 
   private async resolveStore(slug: string): Promise<{
@@ -125,11 +127,25 @@ export class StorefrontService {
         include: {
           brand: true,
           variants: { where: { deletedAt: null }, orderBy: { position: 'asc' } },
-          images: { orderBy: { position: 'asc' } },
+          images: {
+            orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
+            select: { id: true, altText: true, isPrimary: true, media: { select: { objectKey: true } } },
+          },
         },
       }),
     );
     if (!product) throw new NotFoundException('Product not found');
-    return product;
+
+    // Presign a short-lived GET url per image so the storefront can render it.
+    const images = await Promise.all(
+      product.images.map(async ({ media, ...img }) => ({
+        ...img,
+        url:
+          media?.objectKey && this.s3.isConfigured
+            ? await this.s3.presignDownload(media.objectKey).catch(() => null)
+            : null,
+      })),
+    );
+    return { ...product, images };
   }
 }
