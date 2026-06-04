@@ -7,7 +7,7 @@
 
 | Milestone | Status | Notes |
 |-----------|--------|-------|
-| **P2.1** Test suite + CI gating | 🟨 In progress | First batch: critical pure logic extracted to testable units (RBAC match, platform-fee math, CSV import parsing) + Jest specs; `reflect-metadata` setup so DTO specs run. **35 tests / 5 suites green.** Next: service-level + worker tests, DB-integration tests, CI gate on `pnpm test`. |
+| **P2.1** Test suite + CI gating | 🟨 In progress | Pure-logic units (RBAC match, platform-fee math, CSV parsing) + **service tests** (shipping status→fulfillment+notify; returns approve/refund state-machine + restock + manual path, mocked Prisma/Stripe/Notifications) + **worker test runner** (jest) + email-template tests. **50 tests / 8 suites green** (api 44 / worker 6). CI **already gates `pnpm test`** (Postgres+Redis services + RLS) — covers these + the db isolation test. Next: orders/gdpr service tests, worker processor tests, promote contract smokes to DB-integration tests. |
 | **P2.2** Auth/session security | 🟦 Planned | httpOnly-cookie sessions + refresh rotation, rate limiting, remove JWT-in-localStorage. |
 | **P2.3** Live integrations | 🟦 Planned | Stripe test-mode e2e (`stripe listen`), Shippo auto-label, real SMTP + runbooks. |
 | **P2.4** Perf + observability | 🟦 Planned | k6 load tests, BullMQ queue-depth + business metrics, dashboards/alerts, DB index review. |

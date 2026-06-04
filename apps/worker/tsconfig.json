@@ -4,7 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
-    "types": ["node"],
+    "types": ["node", "jest"],
     // `nest build` wipes dist via deleteOutDir; disable TS incremental so the
     // emit is always complete (a stale .tsbuildinfo would otherwise skip
     // re-emitting unchanged files and leave dist missing modules).

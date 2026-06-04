@@ -300,12 +300,21 @@ importers:
       '@swc/core':
         specifier: ^1.10.1
         version: 1.15.40
+      '@swc/jest':
+        specifier: ^0.2.37
+        version: 0.2.39(@swc/core@1.15.40)
+      '@types/jest':
+        specifier: ^29.5.14
+        version: 29.5.14
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.19
       '@types/nodemailer':
         specifier: ^6.4.17
         version: 6.4.23
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@22.19.19)
       pino-pretty:
         specifier: ^13.0.0
         version: 13.1.3
