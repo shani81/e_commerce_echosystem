@@ -1,0 +1,20 @@
+# Build artifacts + deps (reinstalled/rebuilt inside the image)
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.turbo
+coverage
+**/*.tsbuildinfo
+
+# Secrets / local env — injected at runtime, never baked into an image
+.env
+**/.env
+.keys
+
+# VCS + scratch
+.git
+.gitignore
+.verify
+*.log
