@@ -105,9 +105,9 @@ API key.
 - **Where to get it:** **Google AI Studio → Get API key** → https://aistudio.google.com/apikey
   (create a key; the free tier is rate-limited but works for testing). No GCP project/billing
   setup required for the AI Studio key.
-- **Model:** `gemini-2.0-flash` (default; used for both chat + vision). Override per call via
-  `request.model` or the provider's `model` config. Embeddings (`text-embedding-004`) are stubbed
-  and unused here.
+- **Model:** `gemini-2.5-flash` (default; used for both chat + vision). Override via `GEMINI_MODEL`
+  (e.g. `gemini-flash-latest` to always track the newest flash and avoid breakage when a version is
+  retired) or per call via `request.model`. Embeddings (`text-embedding-004`) are stubbed/unused here.
 - **Capability used:** `:generateContent` with **inline image data**
   (`inline_data: { mime_type, data: <base64 frame> }`) and `responseMimeType: application/json`.
 

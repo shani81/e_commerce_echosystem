@@ -46,7 +46,9 @@ export class GeminiProvider implements AiProvider {
 
   constructor(config: GeminiProviderConfig = {}) {
     this.config = config;
-    const chat = config.model ?? 'gemini-2.0-flash';
+    // `gemini-2.0-flash` was retired (404). Default to the current flash; override
+    // per call/config (e.g. `gemini-flash-latest` to always track the newest).
+    const chat = config.model ?? 'gemini-2.5-flash';
     this.models = {
       chat,
       vision: chat,
