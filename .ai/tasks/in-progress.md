@@ -7,7 +7,7 @@
 
 | Milestone | Status | Notes |
 |-----------|--------|-------|
-| **P2.1** Test suite + CI gating | 🟨 In progress | Pure-logic units (RBAC match, platform-fee math, CSV parsing) + **service tests** (shipping status→fulfillment+notify; returns approve/refund state-machine + restock + manual path, mocked Prisma/Stripe/Notifications) + **worker test runner** (jest) + email-template tests. **50 tests / 8 suites green** (api 44 / worker 6). CI **already gates `pnpm test`** (Postgres+Redis services + RLS) — covers these + the db isolation test. Next: orders/gdpr service tests, worker processor tests, promote contract smokes to DB-integration tests. |
+| **P2.1** Test suite + CI gating | ✅ Done | Jest suites across: pure logic (RBAC match, platform-fee math, CSV parsing, pagination), **services** (shipping, returns, orders, gdpr — mocked Prisma/Stripe/Notifications), **worker processors** (notifications, dsar — `@aicos/db` `withTenant` mocked) + email templates; plus the pre-existing roles.guard spec and the db RLS isolation (Vitest). **67 tests / 12 suites green** (api 52 / worker 15). CI **already gates `pnpm test`** (Postgres+Redis + RLS) on every PR. Enhancement (non-blocking): promote the contract smokes to in-runner DB-integration tests (they already provide integration coverage as scripts). |
 | **P2.2** Auth/session security | 🟦 Planned | httpOnly-cookie sessions + refresh rotation, rate limiting, remove JWT-in-localStorage. |
 | **P2.3** Live integrations | 🟦 Planned | Stripe test-mode e2e (`stripe listen`), Shippo auto-label, real SMTP + runbooks. |
 | **P2.4** Perf + observability | 🟦 Planned | k6 load tests, BullMQ queue-depth + business metrics, dashboards/alerts, DB index review. |
