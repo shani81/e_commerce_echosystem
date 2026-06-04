@@ -81,6 +81,14 @@ export class S3Service {
     return getSignedUrl(client, command, { expiresIn });
   }
 
+  /** Upload bytes directly (server-side) — e.g. a product image grabbed from a lookup. */
+  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    const client = this.requireClient();
+    await client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }),
+    );
+  }
+
   /** Presigned GET URL for time-limited read access to an object. */
   presignDownload(
     key: string,

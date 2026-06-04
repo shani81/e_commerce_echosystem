@@ -211,9 +211,40 @@ export class ExtractionProcessor extends WorkerHost {
       : analysis.products;
     const note = haveReal ? null : analysis.note;
 
+    // Grab canonical product images (from barcode lookups) into storage OUTSIDE
+    // the tx, so accepted products get a real photo. Keyed by source URL.
+    const imageKeyByUrl = new Map<string, string>();
+    const uploadBucket = this.sampler.uploadBucket;
+    if (uploadBucket) {
+      const urls = [...new Set(products.map((p) => p.imageUrl).filter((u): u is string => Boolean(u)))];
+      for (const url of urls) {
+        const img = await this.barcodeLookup.fetchImage(url);
+        if (!img) continue;
+        const key = `extractions/${claim.jobId}/product_${imageKeyByUrl.size}.jpg`;
+        if (await this.sampler.uploadFrame(key, img.bytes)) imageKeyByUrl.set(url, key);
+      }
+    }
+
     // tx3 — persist results + review items; hand to the human review gate.
     await withTenant(this.prisma.client, tenantId, async (tx) => {
       for (const p of products) {
+        let imageMediaIds: string[] = [];
+        const imageKey = p.imageUrl ? imageKeyByUrl.get(p.imageUrl) : undefined;
+        if (imageKey && uploadBucket) {
+          const asset = await tx.mediaAsset.create({
+            data: {
+              tenantId,
+              type: MediaType.IMAGE,
+              status: MediaStatus.READY,
+              bucket: uploadBucket,
+              objectKey: imageKey,
+              mimeType: 'image/jpeg',
+              isTemporary: true,
+            },
+            select: { id: true },
+          });
+          imageMediaIds = [asset.id];
+        }
         const result = await tx.extractionResult.create({
           data: {
             tenantId,
@@ -227,7 +258,7 @@ export class ExtractionProcessor extends WorkerHost {
             overallConfidence: p.overallConfidence,
             fieldConfidence: p.fieldConfidence as Prisma.InputJsonValue,
             sourceFrameIds: frameIds.slice(0, 2) as Prisma.InputJsonValue,
-            imageMediaIds: [] as Prisma.InputJsonValue,
+            imageMediaIds: imageMediaIds as Prisma.InputJsonValue,
           },
           select: { id: true },
         });

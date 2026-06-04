@@ -12,6 +12,8 @@ export interface ExtractedProduct {
   fieldConfidence: Record<string, number>;
   /** GTIN/UPC/EAN when this came from a barcode lookup; carried to the product. */
   barcode?: string | null;
+  /** Canonical product image URL from a barcode lookup (grabbed into storage). */
+  imageUrl?: string | null;
 }
 
 /** Analyzer outcome — the products plus whether they came from the live model. */

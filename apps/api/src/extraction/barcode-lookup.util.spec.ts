@@ -1,4 +1,4 @@
-import { isProductCode, lookupBarcodeProduct } from './barcode-lookup.util';
+import { fetchImageBytes, isProductCode, lookupBarcodeProduct } from './barcode-lookup.util';
 
 describe('barcode-lookup util', () => {
   const realFetch = global.fetch;
@@ -12,12 +12,17 @@ describe('barcode-lookup util', () => {
     expect(isProductCode('ABC')).toBe(false);
   });
 
-  it('maps an Open Food Facts hit to a product', async () => {
+  it('maps an Open Food Facts hit to a product (incl. image)', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         status: 1,
-        product: { product_name: 'Cola', brands: 'Coca-Cola, Coke', categories: 'en:beverages, en:sodas' },
+        product: {
+          product_name: 'Cola',
+          brands: 'Coca-Cola, Coke',
+          categories: 'en:beverages, en:sodas',
+          image_front_url: 'https://images.off.org/cola.jpg',
+        },
       }),
     }) as unknown as typeof fetch;
 
@@ -25,7 +30,26 @@ describe('barcode-lookup util', () => {
       title: 'Cola',
       brand: 'Coca-Cola',
       category: 'sodas',
+      imageUrl: 'https://images.off.org/cola.jpg',
     });
+  });
+
+  it('fetchImageBytes downloads an image and rejects non-images', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/jpeg' },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+    }) as unknown as typeof fetch;
+    const img = await fetchImageBytes('https://x/img.jpg');
+    expect(img?.contentType).toBe('image/jpeg');
+    expect(img?.bytes.length).toBe(4);
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'text/html' },
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+    }) as unknown as typeof fetch;
+    expect(await fetchImageBytes('https://x/page.html')).toBeNull();
   });
 
   it('skips a non-numeric code without calling the network', async () => {
