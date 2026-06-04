@@ -8,6 +8,7 @@ import {
 } from '@aicos/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ShippoService, type ShippoAddress, type ShippoLabel } from './shippo.service';
 import type { CreateShipmentDto } from './dto/create-shipment.dto';
 import type { UpdateShipmentDto } from './dto/update-shipment.dto';
 
@@ -26,11 +27,12 @@ export class ShippingService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
+    private readonly shippo: ShippoService,
   ) {}
 
   /** Whether the Shippo aggregator is configured (auto-label purchase). */
   get autoLabelEnabled(): boolean {
-    return Boolean(this.config.get<string>('shipping.shippoApiKey'));
+    return this.shippo.isConfigured;
   }
 
   async create(
@@ -39,26 +41,100 @@ export class ShippingService {
     dto: CreateShipmentDto,
   ): Promise<Shipment> {
     const order = await this.prisma.forTenant(tenantId, (tx) =>
-      tx.order.findFirst({ where: { id: orderId, tenantId }, select: { id: true } }),
+      tx.order.findFirst({
+        where: { id: orderId, tenantId },
+        select: { id: true, shippingAddress: true },
+      }),
     );
     if (!order) throw new NotFoundException('Order not found');
 
+    // Optionally buy a Shippo label; any failure (no key, missing address, API
+    // error) degrades to a manual shipment so fulfillment is never blocked.
+    let label: ShippoLabel | null = null;
+    if (dto.buyLabel && this.shippo.isConfigured) {
+      label = await this.tryBuyLabel(tenantId, order.shippingAddress, dto).catch((err: unknown) => {
+        this.logger.warn(
+          `auto-label failed for order ${orderId} — manual shipment: ${err instanceof Error ? err.message : 'unknown'}`,
+        );
+        return null;
+      });
+    }
+
+    const hasLabel = label !== null || Boolean(dto.trackingNumber);
     return this.prisma.forTenant(tenantId, (tx) =>
       tx.shipment.create({
         data: {
           tenantId,
           orderId,
           provider: 'SHIPPO',
-          status: dto.trackingNumber ? ShipmentStatus.LABEL_PURCHASED : ShipmentStatus.PENDING,
-          carrier: dto.carrier ?? null,
-          service: dto.service ?? null,
-          trackingNumber: dto.trackingNumber ?? null,
-          trackingUrl: dto.trackingUrl ?? null,
-          rateAmountCents: dto.rateAmountCents ?? null,
+          status: hasLabel ? ShipmentStatus.LABEL_PURCHASED : ShipmentStatus.PENDING,
+          carrier: label?.carrier ?? dto.carrier ?? null,
+          service: label?.service ?? dto.service ?? null,
+          trackingNumber: label?.trackingNumber ?? dto.trackingNumber ?? null,
+          trackingUrl: label?.trackingUrl ?? dto.trackingUrl ?? null,
+          labelUrlCached: label?.labelUrl ?? null,
+          rateAmountCents: label?.rateAmountCents ?? dto.rateAmountCents ?? null,
+          currency: label?.currency ?? 'USD',
           weightGrams: dto.weightGrams ?? null,
         },
       }),
     );
+  }
+
+  /** Resolve ship-from (default location) + ship-to (order snapshot) → buy label. */
+  private async tryBuyLabel(
+    tenantId: string,
+    shippingAddress: Prisma.JsonValue,
+    dto: CreateShipmentDto,
+  ): Promise<ShippoLabel | null> {
+    const to = this.toAddress(shippingAddress);
+    if (!to) return null; // no ship-to on the order
+
+    const location = await this.prisma.forTenant(tenantId, (tx) =>
+      tx.inventoryLocation.findFirst({
+        where: { tenantId, isDefault: true, addressId: { not: null } },
+        include: { address: true },
+      }),
+    );
+    if (!location?.address) return null; // no ship-from configured
+    const a = location.address;
+    const from: ShippoAddress = {
+      name: a.company ?? ([a.firstName, a.lastName].filter(Boolean).join(' ') || 'Warehouse'),
+      street1: a.line1,
+      street2: a.line2,
+      city: a.city,
+      state: a.region,
+      zip: a.postalCode,
+      country: a.country,
+      phone: a.phone,
+    };
+    return this.shippo.buyLabel(from, to, {
+      lengthCm: dto.lengthCm ?? 20,
+      widthCm: dto.widthCm ?? 15,
+      heightCm: dto.heightCm ?? 10,
+      weightG: dto.weightGrams ?? 500,
+    });
+  }
+
+  /** Coerce an Order.shippingAddress JSON snapshot into a Shippo address. */
+  private toAddress(json: Prisma.JsonValue): ShippoAddress | null {
+    if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+    const a = json as Record<string, unknown>;
+    const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined);
+    const street1 = str(a.line1) ?? str(a.street1);
+    const city = str(a.city);
+    const country = str(a.country);
+    if (!street1 || !city || !country) return null;
+    return {
+      name: [str(a.firstName), str(a.lastName)].filter(Boolean).join(' ') || str(a.name) || 'Customer',
+      street1,
+      street2: str(a.line2) ?? str(a.street2) ?? null,
+      city,
+      state: str(a.region) ?? str(a.state) ?? null,
+      zip: str(a.postalCode) ?? str(a.zip) ?? null,
+      country,
+      phone: str(a.phone) ?? null,
+    };
   }
 
   list(tenantId: string, orderId: string): Promise<Shipment[]> {

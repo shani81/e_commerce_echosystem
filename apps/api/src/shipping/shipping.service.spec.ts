@@ -4,6 +4,7 @@ import { ShipmentStatus } from '@aicos/db';
 import { ShippingService } from './shipping.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { NotificationsService } from '../notifications/notifications.service';
+import type { ShippoService } from './shippo.service';
 
 interface Tx {
   shipment: { findFirst: jest.Mock; update: jest.Mock };
@@ -22,6 +23,7 @@ function setup(existing: unknown) {
     { forTenant } as unknown as PrismaService,
     { enqueue } as unknown as NotificationsService,
     { get } as unknown as ConfigService,
+    { isConfigured: false } as unknown as ShippoService,
   );
   return { svc, tx, enqueue, get };
 }
@@ -80,13 +82,15 @@ describe('ShippingService.update', () => {
 });
 
 describe('ShippingService.autoLabelEnabled', () => {
-  it('is true only when SHIPPO_API_KEY is configured', () => {
-    const on = setup(null);
-    on.get.mockReturnValue('shippo_test_key');
-    expect(on.svc.autoLabelEnabled).toBe(true);
-
-    const off = setup(null);
-    off.get.mockReturnValue(undefined);
-    expect(off.svc.autoLabelEnabled).toBe(false);
+  it('reflects ShippoService.isConfigured', () => {
+    const mk = (configured: boolean) =>
+      new ShippingService(
+        {} as unknown as PrismaService,
+        {} as unknown as NotificationsService,
+        {} as unknown as ConfigService,
+        { isConfigured: configured } as unknown as ShippoService,
+      );
+    expect(mk(true).autoLabelEnabled).toBe(true);
+    expect(mk(false).autoLabelEnabled).toBe(false);
   });
 });

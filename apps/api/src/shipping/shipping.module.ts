@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ShippingService } from './shipping.service';
+import { ShippoService } from './shippo.service';
 import { ShippingController } from './shipping.controller';
 
 /**
@@ -10,6 +11,6 @@ import { ShippingController } from './shipping.controller';
 @Module({
   imports: [NotificationsModule],
   controllers: [ShippingController],
-  providers: [ShippingService],
+  providers: [ShippingService, ShippoService],
 })
 export class ShippingModule {}
