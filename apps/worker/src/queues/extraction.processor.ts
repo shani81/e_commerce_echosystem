@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 import { FrameSamplerService, type SourceMedia } from '../extraction/frame-sampler.service';
 import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
+import { BarcodeScannerService } from '../extraction/barcode-scanner.service';
 
 /**
  * Consumer for the `extraction` queue — the flagship AI product-extraction
@@ -43,6 +44,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly analyzer: ExtractionAnalyzer,
     private readonly sampler: FrameSamplerService,
     private readonly semanticDeduper: SemanticDeduperService,
+    private readonly barcodeScanner: BarcodeScannerService,
   ) {
     super();
   }
@@ -96,11 +98,19 @@ export class ExtractionProcessor extends WorkerHost {
     const sampled = await this.semanticDeduper.dedupe(sampledRaw);
     const usingRealFrames = sampled.length > 0;
 
+    // Decode product barcodes from each frame (stored per-frame + fed to the
+    // vision model as GTIN hints). Aligned by index with `sampled`.
+    const barcodes = sampled.map((f) =>
+      this.barcodeScanner.scan(Buffer.from(f.image.base64 ?? '', 'base64')),
+    );
+    const barcodeHints = [...new Set(barcodes.filter((b): b is string => Boolean(b)))];
+
     // tx2 — persist the frames (real or placeholder) and advance to ANALYZING.
     const frameIds = await withTenant(this.prisma.client, tenantId, async (tx) => {
       const ids: string[] = [];
       if (usingRealFrames) {
-        for (const f of sampled) {
+        for (let i = 0; i < sampled.length; i++) {
+          const f = sampled[i]!;
           const row = await tx.extractionFrame.create({
             data: {
               tenantId,
@@ -109,6 +119,7 @@ export class ExtractionProcessor extends WorkerHost {
               frameIndex: f.frameIndex,
               timestampMs: f.timestampMs,
               blurScore: f.blurScore,
+              barcode: barcodes[i] ?? null,
               providerUsed: AiProvider.GEMINI,
             },
             select: { id: true },
@@ -142,7 +153,7 @@ export class ExtractionProcessor extends WorkerHost {
     // `analysis.live` is the authoritative "real AI ran" flag; `note` carries
     // the fallback reason (e.g. quota/HTTP error) for the review UI.
     const images: AiImage[] = sampled.map((f) => f.image);
-    const analysis = await this.analyzer.analyze(images);
+    const analysis = await this.analyzer.analyze(images, barcodeHints);
     const products = analysis.products;
 
     // tx3 — persist results + review items; hand to the human review gate.

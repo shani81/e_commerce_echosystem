@@ -63,16 +63,21 @@ export class ExtractionAnalyzer {
     return this.hasModelKey;
   }
 
-  async analyze(images: AiImage[]): Promise<AnalyzeResult> {
+  async analyze(images: AiImage[], barcodes: string[] = []): Promise<AnalyzeResult> {
     if (!this.hasModelKey) {
       return { products: [...MOCK], live: false, note: 'No AI model key configured — showing sample products.' };
     }
     if (images.length === 0) {
       return { products: [...MOCK], live: false, note: 'No frames to analyze — showing sample products.' };
     }
+    // Feed decoded barcodes to the model so it can resolve exact products by GTIN.
+    const prompt = barcodes.length
+      ? `${EXTRACTION_PROMPT}\n\nDetected barcodes on the shelf (GTIN/UPC/EAN), one per product where ` +
+        `visible: ${barcodes.join(', ')}. Use them to identify the exact products when you can.`
+      : EXTRACTION_PROMPT;
     try {
       const res = await this.router.vision(
-        { prompt: EXTRACTION_PROMPT, images, json: true, maxTokens: 2048 },
+        { prompt, images, json: true, maxTokens: 2048 },
         { alias: 'extraction.primary' },
       );
       const enriched = enrichProducts(parseProducts(res.text));

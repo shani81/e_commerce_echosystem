@@ -10,6 +10,7 @@ import { MailService } from '../mail/mail.service';
 import { ExtractionAnalyzer } from '../extraction/extraction-analyzer.service';
 import { FrameSamplerService } from '../extraction/frame-sampler.service';
 import { SemanticDeduperService } from '../extraction/semantic-deduper.service';
+import { BarcodeScannerService } from '../extraction/barcode-scanner.service';
 import { MetricsModule } from '../metrics/metrics.module';
 
 /**
@@ -41,6 +42,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     ExtractionAnalyzer,
     FrameSamplerService,
     SemanticDeduperService,
+    BarcodeScannerService,
   ],
 })
 export class QueuesModule {}
