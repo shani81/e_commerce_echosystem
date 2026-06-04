@@ -5,7 +5,7 @@ import { Button, Badge, Card, type BadgeVariant } from '@aicos/ui';
 import { PageHeader } from '@/components/ui/page-header';
 import { Field, Input } from '@/components/ui/field';
 import { Table, THead, TBody, Tr, Th, Td, EmptyRow } from '@/components/ui/table';
-import { apiGet, apiPost, ApiError, type Paginated } from '@/lib/api';
+import { apiGet, apiPost, apiDelete, ApiError, type Paginated } from '@/lib/api';
 
 interface JobSummary {
   id: string;
@@ -28,8 +28,17 @@ interface ResultReview {
   reviewItem: { decision: string } | null;
   product: { id: string; slug: string; status: string } | null;
 }
+interface FrameInfo {
+  id: string;
+  frameIndex: number;
+  timestampMs: number | null;
+  blurScore: number | null;
+  barcode: string | null;
+}
 interface JobDetail extends JobSummary {
+  errorMessage: string | null;
   results: ResultReview[];
+  frames: FrameInfo[];
 }
 
 function money(cents: number | null, currency = 'USD'): string {
@@ -59,6 +68,7 @@ export default function ExtractionPage() {
   const [file, setFile] = React.useState<File | null>(null);
   const [uploading, setUploading] = React.useState(false);
   const [selected, setSelected] = React.useState<JobDetail | null>(null);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -128,6 +138,23 @@ export default function ExtractionPage() {
       setSelected(await apiGet<JobDetail>(`/extractions/${id}`));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load job.');
+    }
+  }
+
+  async function deleteJob(id: string) {
+    if (!window.confirm('Delete this extraction job and its frames/results? Accepted draft products are kept.')) {
+      return;
+    }
+    setDeletingId(id);
+    setError(null);
+    try {
+      await apiDelete(`/extractions/${id}`);
+      if (selected?.id === id) setSelected(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not delete this job.');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -209,9 +236,19 @@ export default function ExtractionPage() {
                 <Td className="text-right tabular-nums">{j._count?.results ?? j.productsFound}</Td>
                 <Td className="text-neutral-500">{new Date(j.createdAt).toLocaleDateString()}</Td>
                 <Td className="text-right">
-                  <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>
-                    Review
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>
+                      Review
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={deletingId === j.id}
+                      onClick={() => deleteJob(j.id)}
+                    >
+                      {deletingId === j.id ? 'Deleting…' : 'Delete'}
+                    </Button>
+                  </div>
                 </Td>
               </Tr>
             ))
@@ -276,6 +313,14 @@ function JobReviewPanel({
         Accept turns a detected product into a DRAFT — then publish it from Catalog.
       </p>
 
+      {job.errorMessage ? (
+        <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <span className="font-semibold">Showing sample data.</span> The AI didn&apos;t return live
+          results for this job:{' '}
+          <span className="break-words font-mono text-xs text-amber-700">{job.errorMessage}</span>
+        </div>
+      ) : null}
+
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase tracking-wide text-neutral-500">
@@ -330,6 +375,44 @@ function JobReviewPanel({
           </tbody>
         </table>
       </div>
+
+      {job.frames.length > 0 ? (
+        <div className="mt-5">
+          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Frames the AI analyzed ({job.frames.length})
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-neutral-500">
+                <tr>
+                  <th className="py-1.5">#</th>
+                  <th className="py-1.5">Time</th>
+                  <th className="py-1.5 text-right">Sharpness</th>
+                  <th className="py-1.5">Barcode</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {job.frames.map((f) => (
+                  <tr key={f.id}>
+                    <td className="py-1.5 text-neutral-700">{f.frameIndex}</td>
+                    <td className="py-1.5 tabular-nums text-neutral-600">
+                      {f.timestampMs != null ? `${(f.timestampMs / 1000).toFixed(1)}s` : '—'}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-neutral-600">
+                      {f.blurScore != null ? Math.round(f.blurScore) : '—'}
+                    </td>
+                    <td className="py-1.5 font-mono text-xs text-neutral-600">{f.barcode ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1 text-xs text-neutral-400">
+            Evenly sampled across the video; blurry &amp; near-duplicate frames were dropped. Higher
+            sharpness = clearer.
+          </p>
+        </div>
+      ) : null}
 
       {error ? <p className="mt-3 text-sm font-medium text-danger">{error}</p> : null}
     </Card>

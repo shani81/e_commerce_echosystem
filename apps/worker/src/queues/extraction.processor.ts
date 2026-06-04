@@ -139,8 +139,11 @@ export class ExtractionProcessor extends WorkerHost {
 
     // analyze OUTSIDE the tx (may call the vision model). Real frame images +
     // a model key → ai-core Gemini vision; otherwise the deterministic mock.
+    // `analysis.live` is the authoritative "real AI ran" flag; `note` carries
+    // the fallback reason (e.g. quota/HTTP error) for the review UI.
     const images: AiImage[] = sampled.map((f) => f.image);
-    const products = await this.analyzer.analyze(images);
+    const analysis = await this.analyzer.analyze(images);
+    const products = analysis.products;
 
     // tx3 — persist results + review items; hand to the human review gate.
     await withTenant(this.prisma.client, tenantId, async (tx) => {
@@ -171,12 +174,15 @@ export class ExtractionProcessor extends WorkerHost {
           status: ExtractionJobStatus.AWAITING_REVIEW,
           productsFound: products.length,
           completedAt: new Date(),
+          // Surface the fallback reason (quota/HTTP error/no-key) to the UI;
+          // cleared when real AI results were used.
+          errorMessage: analysis.live ? null : analysis.note ?? null,
         },
       });
     });
 
     await job.updateProgress(100);
-    const mode = usingRealFrames ? (this.analyzer.live ? 'live vision' : 'mock (no AI key)') : 'mock (no frames)';
+    const mode = analysis.live ? 'live vision' : `mock (${analysis.note ?? 'fallback'})`;
     this.logger.log(
       `extraction ${extractionRunId} → ${products.length} draft results AWAITING_REVIEW ` +
         `(${frameIds.length} frames, ${mode})`,

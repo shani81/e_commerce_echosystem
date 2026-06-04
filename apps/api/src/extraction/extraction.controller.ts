@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -44,6 +45,12 @@ export class ExtractionController {
   @Permissions(PERMISSIONS.EXTRACTION_READ)
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.extraction.findOne(tenantId, id);
+  }
+
+  @Delete(':id')
+  @Permissions(PERMISSIONS.EXTRACTION_WRITE)
+  remove(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.extraction.remove(tenantId, id);
   }
 
   @Post('results/:resultId/accept')
