@@ -6,6 +6,7 @@ import {
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { configuration, validateEnv } from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
@@ -32,6 +33,7 @@ import { ImportModule } from './import/import.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { CsrfGuard } from './common/guards/csrf.guard';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 /**
@@ -82,6 +84,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       }),
     }),
 
+    // Global rate limit (200 req / 60s / IP); auth endpoints add a tighter
+    // @Throttle (10/min). Storage is in-memory (per-instance) — move to the
+    // Redis storage adapter when scaling horizontally.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
+
     PrismaModule,
     AuthModule,
     IamModule,
@@ -104,6 +111,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ImportModule,
   ],
   providers: [
+    // Guard order matters: rate-limit first, then CSRF (cookie sessions), then
+    // authn (JwtAuthGuard), then authz (RolesGuard).
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
